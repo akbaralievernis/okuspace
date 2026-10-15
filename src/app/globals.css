@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+/* Базовые токены. Полноценная дизайн-система — этап 4. */
+@theme {
+  --color-brand-600: #1d4ed8;
+  --color-brand-700: #1e40af;
+  --color-surface: #ffffff;
+  --color-ink: #111827;
+  --color-muted: #4b5563;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-surface text-ink antialiased;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+}
