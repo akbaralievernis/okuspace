@@ -20,7 +20,14 @@ const nextConfig: NextConfig = {
   // В домашней папке пользователя лежит посторонний package-lock.json — фиксируем корень проекта явно.
   turbopack: { root: __dirname },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    // Страницы с одноразовыми токенами в URL не передают адрес через Referer.
+    // Более поздние правила переопределяют одноимённые заголовки предыдущих.
+    const noReferrer = [{ key: 'Referrer-Policy', value: 'no-referrer' }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      { source: '/:locale/auth/confirm', headers: noReferrer },
+      { source: '/:locale/invite/:token', headers: noReferrer },
+    ];
   },
 };
 

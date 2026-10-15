@@ -16,9 +16,9 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: process.env.PW_CHANNEL } },
     { name: 'mobile', use: { ...devices['Pixel 7'], channel: process.env.PW_CHANNEL } },
   ],
-  // E2E идут против production-сборки (`npm run build` выполняется заранее).
+  // E2E идут против production-сборки с .env.e2e (`npm run build:e2e` выполняется заранее).
   webServer: {
-    command: `npx next start -p ${PORT}`,
+    command: `node scripts/with-env.mjs .env.e2e next start -p ${PORT}`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

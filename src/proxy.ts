@@ -1,3 +1,4 @@
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { LOCALE_COOKIE, isLocale, negotiateLocale } from '@/i18n/config';
 
@@ -20,7 +21,7 @@ export function buildCsp(nonce: string, options: { dev: boolean; supabaseUrl?: s
   ].join('; ');
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   // Путь без префикса локали → перенаправляем на выбранную локаль, сохраняя путь и query.
@@ -35,19 +36,43 @@ export function proxy(request: NextRequest) {
   }
 
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce, {
-    dev: process.env.NODE_ENV === 'development',
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  });
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const csp = buildCsp(nonce, { dev: process.env.NODE_ENV === 'development', supabaseUrl });
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('Content-Security-Policy', csp);
+  // Ответ пересоздаётся, если Supabase обновил cookie сессии (заголовки запроса тоже обновляются).
+  const makeResponse = () => {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-nonce', nonce);
+    requestHeaders.set('Content-Security-Policy', csp);
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set('Content-Security-Policy', csp);
+    // Запоминаем выбранный язык, чтобы следующий заход без префикса открыл его же.
+    res.cookies.set(LOCALE_COOKIE, firstSegment, { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 });
+    return res;
+  };
+  let response = makeResponse();
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set('Content-Security-Policy', csp);
-  // Запоминаем выбранный язык, чтобы следующий заход без префикса открыл его же.
-  response.cookies.set(LOCALE_COOKIE, firstSegment, { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 });
+  // Обновление истёкшей сессии Supabase. Решения о доступе здесь НЕ принимаются —
+  // только в серверном коде страниц/действий и в RLS (docs/architecture/AUTH_FLOWS.md §1).
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const hasSessionCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
+  if (supabaseUrl && publishableKey && hasSessionCookie) {
+    const supabase = createServerClient(supabaseUrl, publishableKey, {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
+          response = makeResponse();
+          for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
+        },
+      },
+    });
+    try {
+      await supabase.auth.getUser();
+    } catch {
+      // Сервис Auth недоступен — страница сама обработает отсутствие сессии.
+    }
+  }
   return response;
 }
 

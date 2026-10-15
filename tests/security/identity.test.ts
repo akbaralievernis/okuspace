@@ -2,7 +2,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { expectDenied } from '../db/assert';
 import { BRANCH, ORG, U, createSeededDb } from '../db/fixtures';
-import { as, asService, count, rows } from '../db/harness';
+import { as, asMfa, asService, count, rows } from '../db/harness';
 
 let db: PGlite;
 beforeAll(async () => {
@@ -75,7 +75,7 @@ describe('branches (чужой филиал)', () => {
 
 describe('privilege escalation (административные функции без прав)', () => {
   const grant = (actor: string, profile: string, role: string, branch: string | null, org: string = ORG.A) =>
-    as(db, actor, (tx) =>
+    asMfa(db, actor, (tx) =>
       tx.query(`insert into public.memberships (organization_id, branch_id, profile_id, role) values ($1, $2, $3, $4)`, [
         org, branch, profile, role,
       ]),
@@ -87,7 +87,7 @@ describe('privilege escalation (административные функции 
   });
 
   it('a user cannot change own membership', async () => {
-    const result = await as(db, U.adminA1, (tx) =>
+    const result = await asMfa(db, U.adminA1, (tx) =>
       tx.query(`update public.memberships set role = 'branch_manager' where profile_id = $1`, [U.adminA1]),
     );
     expect(result.affectedRows).toBe(0);
@@ -118,7 +118,7 @@ describe('privilege escalation (административные функции 
   });
 
   it('an admin cannot demote or block a branch manager', async () => {
-    const result = await as(db, U.adminA1, (tx) =>
+    const result = await asMfa(db, U.adminA1, (tx) =>
       tx.query(`update public.memberships set status = 'blocked', status_reason = 'x' where profile_id = $1`, [U.managerA1]),
     );
     expect(result.affectedRows).toBe(0);
@@ -126,7 +126,7 @@ describe('privilege escalation (административные функции 
 
   it('membership cannot be moved to another person or organization', async () => {
     await expectDenied(
-      as(db, U.directorA, (tx) =>
+      asMfa(db, U.directorA, (tx) =>
         tx.query(`update public.memberships set profile_id = $1 where profile_id = $2`, [U.outsider, U.teacherA1]),
       ),
       /immutable/,
@@ -134,24 +134,24 @@ describe('privilege escalation (административные функции 
   });
 
   it('nobody can write RBAC tables or make themselves platform admin via the API', async () => {
-    await expectDenied(as(db, U.directorA, (tx) => tx.query(`insert into public.platform_admins (profile_id) values ($1)`, [U.directorA])));
+    await expectDenied(asMfa(db, U.directorA, (tx) => tx.query(`insert into public.platform_admins (profile_id) values ($1)`, [U.directorA])));
     await expectDenied(
-      as(db, U.directorA, (tx) => tx.query(`insert into public.role_permissions (role, permission) values ('teacher', 'finance.write')`)),
+      asMfa(db, U.directorA, (tx) => tx.query(`insert into public.role_permissions (role, permission) values ('teacher', 'finance.write')`)),
     );
-    await expectDenied(as(db, U.directorA, (tx) => tx.query(`update public.role_grants set grantable_role = 'org_director'`)));
+    await expectDenied(asMfa(db, U.directorA, (tx) => tx.query(`update public.role_grants set grantable_role = 'org_director'`)));
   });
 
   it('a director cannot suspend or unsuspend their own organization; platform admin can', async () => {
     await expectDenied(
-      as(db, U.directorA, (tx) => tx.query(`update public.organizations set status = 'suspended' where id = $1`, [ORG.A])),
+      asMfa(db, U.directorA, (tx) => tx.query(`update public.organizations set status = 'suspended' where id = $1`, [ORG.A])),
       /only platform admins/,
     );
-    const ok = await as(db, U.platform, (tx) => tx.query(`update public.organizations set status = 'suspended' where id = $1`, [ORG.A]));
+    const ok = await asMfa(db, U.platform, (tx) => tx.query(`update public.organizations set status = 'suspended' where id = $1`, [ORG.A]));
     expect(ok.affectedRows).toBe(1);
   });
 
   it('a blocked member loses access on the next request', async () => {
-    const visible = await as(db, U.directorA, async (tx) => {
+    const visible = await asMfa(db, U.directorA, async (tx) => {
       await tx.query(`update public.memberships set status = 'blocked', status_reason = 'test' where profile_id = $1`, [U.teacherA1]);
       await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: U.teacherA1, role: 'authenticated' })]);
       return count(tx, 'select 1 from public.groups');
@@ -161,7 +161,7 @@ describe('privilege escalation (административные функции 
 
   it('a guardian link cannot be created by the parent themself', async () => {
     await expectDenied(
-      as(db, U.parentA1, (tx) =>
+      asMfa(db, U.parentA1, (tx) =>
         tx.query(`insert into public.guardian_links (organization_id, guardian_id, student_id) values ($1, $2, $3)`, [
           ORG.A, U.parentA1, U.studentA1b,
         ]),
@@ -172,7 +172,7 @@ describe('privilege escalation (административные функции 
 
 describe('invitations', () => {
   const invite = (actor: string, role: string, branch: string | null) =>
-    as(db, actor, (tx) =>
+    asMfa(db, actor, (tx) =>
       tx.query(
         `insert into public.invitations (organization_id, branch_id, email, role, token_hash, expires_at, created_by)
          values ($1, $2, 'new.teacher@example.test', $3, encode(sha256('secret-token'::bytea), 'hex'), now() + interval '3 days', $4)`,
@@ -188,7 +188,7 @@ describe('invitations', () => {
 
   it('reject plain-text tokens and overly long expiry', async () => {
     await expectDenied(
-      as(db, U.adminA1, (tx) =>
+      asMfa(db, U.adminA1, (tx) =>
         tx.query(
           `insert into public.invitations (organization_id, branch_id, email, role, token_hash, expires_at, created_by)
            values ($1, $2, 'x@example.test', 'teacher', 'plain-token', now() + interval '3 days', $3)`,
@@ -202,7 +202,7 @@ describe('invitations', () => {
 
 describe('audit log', () => {
   it('records membership changes with the actor', async () => {
-    const entries = await as(
+    const entries = await asMfa(
       db,
       U.directorA,
       async (tx) => {
@@ -219,9 +219,10 @@ describe('audit log', () => {
   });
 
   it('is readable by the director, not by teachers or other organizations', async () => {
-    expect(await as(db, U.directorA, (tx) => count(tx, 'select 1 from public.audit_logs where organization_id = $1', [ORG.A]))).toBeGreaterThan(0);
-    expect(await as(db, U.teacherA1, (tx) => count(tx, 'select 1 from public.audit_logs'))).toBe(0);
-    expect(await as(db, U.directorB, (tx) => count(tx, 'select 1 from public.audit_logs where organization_id = $1', [ORG.A]))).toBe(0);
+    expect(await asMfa(db, U.directorA, (tx) => count(tx, 'select 1 from public.audit_logs where organization_id = $1', [ORG.A]))).toBeGreaterThan(0);
+    // Преподаватель видит только записи о себе (subject_profile_id), но не журнал организации.
+    expect(await asMfa(db, U.teacherA1, (tx) => count(tx, 'select 1 from public.audit_logs where subject_profile_id is distinct from $1', [U.teacherA1]))).toBe(0);
+    expect(await asMfa(db, U.directorB, (tx) => count(tx, 'select 1 from public.audit_logs where organization_id = $1', [ORG.A]))).toBe(0);
   });
 
   it('is append-only even for the service role', async () => {
@@ -231,7 +232,7 @@ describe('audit log', () => {
   });
 
   it('records invitations but never their token hashes', async () => {
-    const [logged, leaked] = await as(db, U.adminA1, async (tx) => {
+    const [logged, leaked] = await asMfa(db, U.adminA1, async (tx) => {
       await tx.query(
         `insert into public.invitations (organization_id, branch_id, email, role, token_hash, expires_at, created_by)
          values ($1, $2, 'audit@example.test', 'teacher', encode(sha256('t'::bytea), 'hex'), now() + interval '1 day', $3)`,

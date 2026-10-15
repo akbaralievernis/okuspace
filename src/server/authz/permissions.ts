@@ -56,3 +56,18 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
 export function roleHasPermission(role: Role, permission: Permission): boolean {
   return rolePermissions[role].includes(permission);
 }
+
+/** Зеркало public.role_grants: какие роли может выдавать обладатель роли. */
+export const roleGrants: Record<Role, readonly Role[]> = {
+  org_director: ['branch_manager', 'admin', 'sales_manager', 'accountant', 'teacher', 'student', 'parent'],
+  branch_manager: ['admin', 'sales_manager', 'accountant', 'teacher', 'student', 'parent'],
+  admin: ['teacher', 'student', 'parent'],
+  sales_manager: ['student', 'parent'],
+  accountant: [],
+  teacher: [],
+  student: [],
+  parent: [],
+};
+
+/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006). */
+export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund'];

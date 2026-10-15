@@ -24,6 +24,17 @@ create table auth.users (
   created_at         timestamptz not null default now()
 );
 
+-- Подмножество столбцов auth.sessions Supabase (aal там — enum auth.aal_level).
+create table auth.sessions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz,
+  user_agent text,
+  ip         inet,
+  aal        text
+);
+
 create function auth.jwt() returns jsonb
 language sql stable
 as $$

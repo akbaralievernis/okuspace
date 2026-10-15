@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:bundle": "node scripts/check-client-bundle.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:bundle && npm run test:e2e"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build:e2e && npm run check:bundle && npm run test:e2e",
+    "build:e2e": "node scripts/with-env.mjs .env.e2e next build",
+    "start:e2e": "node scripts/with-env.mjs .env.e2e next start"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

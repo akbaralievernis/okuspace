@@ -34,6 +34,8 @@ export interface AsOptions {
   aal?: 'aal1' | 'aal2';
   /** По умолчанию изменения откатываются, чтобы тесты не влияли друг на друга. */
   commit?: boolean;
+  /** Дополнительные claims JWT (email, session_id), как их выдаёт Supabase Auth. */
+  claims?: Record<string, unknown>;
 }
 
 async function run<T>(db: PGlite, role: string, claims: object, fn: (tx: Tx) => Promise<T>, commit: boolean): Promise<T> {
@@ -52,7 +54,9 @@ async function run<T>(db: PGlite, role: string, claims: object, fn: (tx: Tx) => 
  * Ошибка внутри fn откатывает транзакцию и пробрасывается наружу.
  */
 export async function as<T>(db: PGlite, userId: string | null, fn: (tx: Tx) => Promise<T>, options: AsOptions = {}): Promise<T> {
-  const claims = userId ? { sub: userId, role: 'authenticated', aal: options.aal ?? 'aal1' } : { role: 'anon' };
+  const claims = userId
+    ? { sub: userId, role: 'authenticated', aal: options.aal ?? 'aal1', ...options.claims }
+    : { role: 'anon' };
   return run(db, userId ? 'authenticated' : 'anon', claims, fn, options.commit ?? false);
 }
 
@@ -68,4 +72,9 @@ export async function rows<T = Record<string, unknown>>(tx: Tx | PGlite, sql: st
 export async function count(tx: Tx | PGlite, sql: string, params: unknown[] = []): Promise<number> {
   const result = await tx.query<{ n: number | string }>(`select count(*)::int as n from (${sql}) q`, params);
   return Number(result.rows[0]?.n ?? 0);
+}
+
+/** То же, что as(), но пользователь прошёл MFA (aal2) — для привилегированных действий. */
+export async function asMfa<T>(db: PGlite, userId: string, fn: (tx: Tx) => Promise<T>, options: Omit<AsOptions, 'aal'> = {}): Promise<T> {
+  return as(db, userId, fn, { ...options, aal: 'aal2' });
 }

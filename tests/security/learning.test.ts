@@ -2,7 +2,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { expectDenied } from '../db/assert';
 import { ASSIGN, BRANCH, GROUP, ORG, SUB, U, createSeededDb } from '../db/fixtures';
-import { as, count, rows } from '../db/harness';
+import { as, asMfa, count, rows } from '../db/harness';
 
 let db: PGlite;
 beforeAll(async () => {
@@ -71,7 +71,7 @@ describe('enrollments', () => {
   it('group capacity is enforced', async () => {
     // GROUP.A1: capacity 2, один ученик уже записан.
     await expect(
-      as(db, U.adminA1, async (tx) => {
+      asMfa(db, U.adminA1, async (tx) => {
         await tx.query(
           `insert into public.enrollments (organization_id, branch_id, group_id, student_id, status, created_by) values ($1, $2, $3, $4, 'active', $5)`,
           [ORG.A, BRANCH.A1, GROUP.A1, U.studentA1b, U.adminA1],

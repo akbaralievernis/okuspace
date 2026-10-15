@@ -7,7 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { expectDenied } from '../db/assert';
 import { ASSIGN, BRANCH, COURSE, GROUP, INVOICE, LANG, LEVEL, ORG, PAYMENT, ROOM, U, createSeededDb } from '../db/fixtures';
-import { as, count, type Tx } from '../db/harness';
+import { as, asMfa, count, type Tx } from '../db/harness';
 
 let db: PGlite;
 beforeAll(async () => {
@@ -131,7 +131,7 @@ describe('private profile, guardian links, invitations, organizations, platform 
     expect(await affected(U.studentA1, `update public.profile_private set phone = '+996 555 000 111' where profile_id = $1`, [U.studentA1])).toBe(1);
     expect(await affected(U.studentA1, `update public.profile_private set phone = '+996 555 000 111' where profile_id = $1`, [U.studentA1b])).toBe(0);
     await expectDenied(
-      as(db, U.studentA1, async (tx) => {
+      asMfa(db, U.studentA1, async (tx) => {
         await tx.exec('reset role');
         await tx.query('delete from public.profile_private where profile_id = $1', [U.outsider]);
         await tx.exec('set local role authenticated');
@@ -142,19 +142,19 @@ describe('private profile, guardian links, invitations, organizations, platform 
 
   it('guardian links: scoped staff revoke, parents cannot', async () => {
     const sql = `update public.guardian_links set status = 'revoked' where guardian_id = $1`;
-    expect(await affected(U.parentA1, sql, [U.parentA1])).toBe(0);
-    expect(await affected(U.adminA1, sql, [U.parentA1])).toBe(1);
+    expect((await asMfa(db, U.parentA1, (tx) => tx.query(sql, [U.parentA1]))).affectedRows).toBe(0);
+    expect((await asMfa(db, U.adminA1, (tx) => tx.query(sql, [U.parentA1]))).affectedRows).toBe(1);
   });
 
   it('invitations: granters revoke, others cannot', async () => {
     const revokedBy = (actor: string) =>
-      as(db, U.adminA1, async (tx) => {
+      asMfa(db, U.adminA1, async (tx) => {
         await tx.query(
           `insert into public.invitations (organization_id, branch_id, email, role, token_hash, expires_at, created_by)
            values ($1, $2, 'r@example.test', 'teacher', encode(sha256('r'::bytea), 'hex'), now() + interval '1 day', $3)`,
           [ORG.A, BRANCH.A1, U.adminA1],
         );
-        await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: actor, role: 'authenticated' })]);
+        await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: actor, role: 'authenticated', aal: 'aal2' })]);
         return (await tx.query(`update public.invitations set revoked_at = now() where email = 'r@example.test'`)).affectedRows;
       });
     expect(await revokedBy(U.adminA1)).toBe(1);
@@ -163,8 +163,8 @@ describe('private profile, guardian links, invitations, organizations, platform 
 
   it('organizations: only platform admins create', async () => {
     const create = (tx: Tx) => tx.query(`insert into public.organizations (name, slug) values ('Новая школа', 'new-school')`);
-    await expect(as(db, U.platform, create)).resolves.toBeDefined();
-    await expectDenied(as(db, U.directorA, create));
+    await expect(asMfa(db, U.platform, create)).resolves.toBeDefined();
+    await expectDenied(asMfa(db, U.directorA, create));
   });
 
   it('platform admins list is visible to platform admins only', async () => {
@@ -199,7 +199,7 @@ describe('read policies not covered by scenario tests', () => {
     expect(await n(U.adminA1, 'select 1 from public.guardian_links')).toBe(1);
     expect(await n(U.managerA2, 'select 1 from public.guardian_links')).toBe(0);
     await expect(
-      as(db, U.adminA1, (tx) =>
+      asMfa(db, U.adminA1, (tx) =>
         tx.query(`insert into public.guardian_links (organization_id, guardian_id, student_id) values ($1, $2, $3)`, [ORG.A, U.parentA1, U.studentA1b]),
       ),
     ).resolves.toBeDefined();
@@ -207,13 +207,13 @@ describe('read policies not covered by scenario tests', () => {
 
   it('invitations: visible to role granters only', async () => {
     const visibleTo = (viewer: string) =>
-      as(db, U.adminA1, async (tx) => {
+      asMfa(db, U.adminA1, async (tx) => {
         await tx.query(
           `insert into public.invitations (organization_id, branch_id, email, role, token_hash, expires_at, created_by)
            values ($1, $2, 'v@example.test', 'teacher', encode(sha256('v'::bytea), 'hex'), now() + interval '1 day', $3)`,
           [ORG.A, BRANCH.A1, U.adminA1],
         );
-        await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: viewer, role: 'authenticated' })]);
+        await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: viewer, role: 'authenticated', aal: 'aal2' })]);
         return count(tx, 'select 1 from public.invitations');
       });
     expect(await visibleTo(U.adminA1)).toBe(1);
