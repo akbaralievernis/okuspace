@@ -1,0 +1,58 @@
+import 'server-only';
+
+/**
+ * Зеркало справочников RBAC из миграции 0002 (public.roles, public.permissions,
+ * public.role_permissions). Источник истины — БД; совпадение проверяет
+ * tests/security/rbac-mirror.test.ts. Используется серверной проверкой прав (этап 3).
+ */
+export const roles = [
+  'org_director',
+  'branch_manager',
+  'admin',
+  'sales_manager',
+  'accountant',
+  'teacher',
+  'student',
+  'parent',
+] as const;
+export type Role = (typeof roles)[number];
+
+export const permissions = [
+  'org.manage',
+  'branch.manage',
+  'member.read',
+  'member.manage',
+  'catalog.manage',
+  'group.read',
+  'group.manage',
+  'schedule.manage',
+  'enrollment.manage',
+  'learning.read_all',
+  'finance.read',
+  'finance.write',
+  'finance.refund',
+  'audit.read',
+] as const;
+export type Permission = (typeof permissions)[number];
+
+export const rolePermissions: Record<Role, readonly Permission[]> = {
+  org_director: [
+    'org.manage', 'branch.manage', 'member.read', 'member.manage', 'catalog.manage', 'group.read', 'group.manage',
+    'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read',
+  ],
+  branch_manager: [
+    'branch.manage', 'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage',
+    'enrollment.manage', 'learning.read_all', 'finance.read',
+  ],
+  admin: ['member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage', 'enrollment.manage'],
+  sales_manager: ['member.read', 'member.manage', 'group.read', 'enrollment.manage'],
+  accountant: ['member.read', 'group.read', 'finance.read', 'finance.write', 'finance.refund'],
+  // Права этих ролей определяются связями (группа, запись, опекунство), а не матрицей.
+  teacher: [],
+  student: [],
+  parent: [],
+};
+
+export function roleHasPermission(role: Role, permission: Permission): boolean {
+  return rolePermissions[role].includes(permission);
+}
