@@ -1,4 +1,4 @@
-# Схема базы данных (этапы 2–8)
+# Схема базы данных (этапы 2–9)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -15,6 +15,7 @@
 | `20261018100000_schedule_attendance` (этап 6) | право `attendance.manage` (MFA); тема и автор занятия, запрет менять отменённое и переносить проведённое; `lesson_session_changes` (append-only) и `notifications` (уведомления в кабинете, без дублей); `create_session_series`, `session_conflicts`, `schedule_window`; посещаемость: `attendance_events` (append-only), `attendance_records` (одна на «занятие + ученик»), `attendance_record_history` (append-only), `attendance_codes` (только хеш); `mark_attendance`, `open_attendance_code`, `check_in_with_code`, `ingest_attendance_event` (только service role), `confirm_camera_event` |
 | `20261019100000_ai_lab` (этап 7) | право `ai.manage` (директор, MFA); `ai_settings` (AI выключен по умолчанию, бюджет, дневной лимит, голос — выключен); `ai_calls` (журнал вызовов: резерв → итог, закрывает только сервер); `ai_begin` (лимиты и бюджет под блокировкой школы), `ai_finish` (service role); `ai_conversations`, `ai_messages` (реплики ассистента — только сервер); `ai_feedback` (только сервер), `ai_feedback_disputes` (оспорить может ученик или преподаватель, решает преподаватель), `ai_practice_results` + `record_practice` (проверка в БД), `ai_lab_stats`, `ai_can_resolve` |
 | `20261020100000_crm` (этап 8) | право `crm.admin` (директор, менеджер филиала; MFA); `crm_contacts` (нормализованный телефон, уникальность телефона/email в школе), `crm_events` (история, append-only, только обезличивание), `crm_reminders`, `crm_trial_bookings` (общие места со слотами сайта), `crm_exports` (журнал выгрузок); `lead_requests.contact_id`; `submit_lead_request` и `public_trial_slots` пересозданы: заявка сразу попадает в CRM; функции `crm_book_trial`, `crm_trial_result`, `crm_convert`, `crm_enroll`, `crm_import`, `crm_export`, `crm_erase`, `crm_purge_stale` (service role), `crm_funnel` |
+| `20261021100000_finance_module` (этап 9) | право `finance.approve` (директор, менеджер филиала; MFA); `finance_periods`; `price_lists`, `tariffs` (цена неизменна); `invoice_lines` (сумма черновика считается в БД); `invoice_adjustments` (скидка/кредит/дебет, утверждение другим человеком); `invoice_status_history`; распределения получили «освобождение» (`kind = release`); платежи — источник `staff`/`provider`; `expenses` (сторно); `payment_webhook_events` + `record_provider_payment` (только service role); представление `invoice_balances` пересоздано (+ `due`); `finance_report`, `finance_debts` |
 
 ## 1. Таблицы
 
@@ -72,6 +73,14 @@
 - `crm_events` (append-only), `crm_exports` (append-only)
 - `crm_reminders`, `crm_trial_bookings`
 
+**Финансы (этап 9)**
+
+- `price_lists`, `tariffs`
+- `invoice_lines`, `invoice_adjustments`, `invoice_status_history` (append-only)
+- `expenses` (append-only, сторно)
+- `finance_periods`
+- `payment_webhook_events` (append-only, без политик: только service role)
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -87,7 +96,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `price_lists`, `tariffs`, `invoice_lines`, `webhook_events`, сторнирование распределений | 9 | Полный модуль финансов и платёжный провайдер |
 | `camera_devices`, `occupancy_snapshots`, `attendance_reviews`, `monitoring_policies` | 10 | После юридической проверки |
 | `notifications`, `files`, `integrations` | 11 / 5 | Вместе с очередью уведомлений и загрузкой файлов |
 
@@ -149,7 +157,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 279 тестов на PGlite (этап 8) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 293 теста на PGlite (этап 9) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -252,4 +260,24 @@
 **Хранение и удаление.** `crm_erase` (`crm.admin` + MFA, с основанием) обезличивает контакт: имя, телефон, email, заметки, тексты истории и напоминаний; исходные заявки с сайта удаляются. `crm_purge_stale(24)` (только service role, по расписанию — этап 13) обезличивает неконвертированные контакты без активности дольше 24 месяцев.
 
 Тесты — `tests/security/crm.test.ts` (16).
+
+## 11. Финансы (этап 9)
+
+**Деньги** — только `numeric(14,2)` + ISO 4217 (инвариант схемы проверяется тестом для всех столбцов `amount`/`total`). Сервер приложения передаёт суммы строками; функции БД с неограниченным `numeric` отклоняют больше двух знаков после точки (`p <> round(p, 2)`).
+
+**Счёт.** Черновик со строками: цена строки с тарифом берётся из прайс-листа (ручная цена заменяется), сумма счёта = Σ строк − утверждённые скидки — её считает БД, ручная правка суммы перезаписывается. Выставление — без неутверждённых скидок; выставленный счёт меняется только аннулированием (без оплат). К оплате (`due`) = сумма + утверждённые дебет-ноты − утверждённые кредит-ноты. Каждая смена статуса — строка `invoice_status_history`.
+
+**Утверждение (четыре глаза).** Скидку (на черновик) и кредит/дебет-ноту (на выставленный счёт) запрашивает бухгалтер (`finance.write`), утверждает или отклоняет другой человек с `finance.approve` — один раз. CHECK `decided_by <> requested_by`. Кредит не может превышать неоплаченную часть: чтобы уменьшить оплаченный счёт, сначала освобождается распределение.
+
+**Платежи и возвраты.** Распределение платежа на счёт не превышает остатков платежа и счёта; освобождение (`release`, с причиной, право `finance.refund`) возвращает деньги в свободный остаток платежа; возврат — только из свободного остатка. Ничего не обновляется и не удаляется.
+
+**Периоды.** Закрытый месяц (в поясе школы) не принимает платежей, возвратов, распределений, расходов, корректировок, выставления и аннулирования. Закрывает и открывает (с причиной) `finance.approve` уровня школы; всё в аудите.
+
+**Онлайн-оплата.** `record_provider_payment` (только service role) пишет событие провайдера в `payment_webhook_events` (уникально `(provider, event_id)`), повтор события или той же операции провайдера (`payments_provider_ref_key`) возвращает уже записанный платёж; распределяет не больше остатка счёта. Данные карт платформа не получает.
+
+**Отчёты.** `finance_report(org, from, to)` по филиалам и валютам: выставлено, получено, возвращено, расходы (с учётом сторно), задолженность; `finance_debts(org)` — плательщики с остатком. Только охват `finance.read`.
+
+**Права.** Бухгалтер: счета, строки, запросы корректировок, платежи, возвраты, освобождения, расходы. Директор и менеджер филиала: утверждения, прайс-листы, периоды, чтение. Директор не проводит деньги сам; бухгалтер не утверждает.
+
+Тесты — `tests/security/finance-module.test.ts` (16) и `finance.test.ts` (этап 2).
 

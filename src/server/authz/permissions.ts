@@ -38,6 +38,7 @@ export const permissions = [
   'attendance.manage',
   'ai.manage',
   'crm.admin',
+  'finance.approve',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -45,11 +46,11 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
   org_director: [
     'org.manage', 'branch.manage', 'member.read', 'member.manage', 'catalog.manage', 'group.read', 'group.manage',
     'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read', 'site.manage', 'lead.read', 'lead.manage',
-    'attendance.manage', 'ai.manage', 'crm.admin',
+    'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve',
   ],
   branch_manager: [
     'branch.manage', 'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage',
-    'enrollment.manage', 'learning.read_all', 'finance.read', 'lead.read', 'lead.manage', 'attendance.manage', 'crm.admin',
+    'enrollment.manage', 'learning.read_all', 'finance.read', 'lead.read', 'lead.manage', 'attendance.manage', 'crm.admin', 'finance.approve',
   ],
   admin: [
     'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage', 'enrollment.manage', 'lead.read', 'lead.manage',
@@ -79,5 +80,5 @@ export const roleGrants: Record<Role, readonly Role[]> = {
   parent: [],
 };
 
-/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009–0011). */
-export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin'];
+/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009–0012). */
+export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve'];

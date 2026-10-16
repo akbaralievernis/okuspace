@@ -36,8 +36,9 @@ describe('schema invariants (docs/architecture/DATA_MODEL.md §6)', () => {
 
   it('every RLS table has at least one policy (except service-role-only tables)', async () => {
     // Намеренно без политик — доступ только через функции:
-    // rate_limits — hit_rate_limit(); attendance_codes — open_attendance_code() / check_in_with_code() (хранится лишь хеш).
-    const serviceRoleOnly = ['attendance_codes', 'rate_limits'];
+    // rate_limits — hit_rate_limit(); attendance_codes — open_attendance_code() / check_in_with_code() (хранится лишь хеш);
+    // payment_webhook_events — record_provider_payment() после проверки подписи.
+    const serviceRoleOnly = ['attendance_codes', 'payment_webhook_events', 'rate_limits'];
     const missing = await rows<{ relname: string }>(
       db,
       `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -71,7 +72,7 @@ describe('schema invariants (docs/architecture/DATA_MODEL.md §6)', () => {
       `select table_name, column_name, numeric_precision, numeric_scale from information_schema.columns
        where table_schema = 'public' and column_name in ('amount', 'total') and table_name not like '%balances'`,
     );
-    expect(amounts.map((a) => a.table_name).sort()).toEqual(['invoices', 'payment_allocations', 'payments']);
+    expect(amounts.map((a) => a.table_name).sort()).toEqual(['expenses', 'invoice_adjustments', 'invoices', 'payment_allocations', 'payments', 'tariffs']);
     for (const a of amounts) expect([a.table_name, a.numeric_precision, a.numeric_scale]).toEqual([a.table_name, 14, 2]);
   });
 

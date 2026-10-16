@@ -45,7 +45,10 @@ export type FormErrorCode =
   | 'ai_budget'
   | 'ai_refused'
   | 'ai_invalid_output'
-  | 'ai_input_too_long';
+  | 'ai_input_too_long'
+  | 'period_closed'
+  | 'amount_exceeds'
+  | 'pending_discounts';
 
 export type SuccessCode =
   | 'check_email'

@@ -43,7 +43,8 @@ export type FieldErrorCode =
   | 'place_required'
   | 'count_invalid'
   | 'status_invalid'
-  | 'marks_required';
+  | 'marks_required'
+  | 'amount_invalid';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;
