@@ -9,7 +9,7 @@ export function FormMessage({ state, messages }: { state: FormState; messages: A
   if (state.status === 'error') {
     return (
       <p role="alert" className="rounded-md border border-danger-700 bg-danger-50 px-3 py-2 text-sm text-danger-700">
-        {messages.errors[state.code]}
+        {fmt(messages.errors[state.code], state.data ?? {})}
       </p>
     );
   }

@@ -35,13 +35,26 @@ export type FormErrorCode =
   | 'slot_unavailable'
   | 'slot_full'
   | 'stale_form'
-  | 'no_attempts_left';
+  | 'no_attempts_left'
+  | 'schedule_conflict';
 
-export type SuccessCode = 'check_email' | 'password_updated' | 'signed_out_others' | 'invited' | 'status_changed' | 'mfa_enabled' | 'request_received' | 'saved';
+export type SuccessCode =
+  | 'check_email'
+  | 'password_updated'
+  | 'signed_out_others'
+  | 'invited'
+  | 'status_changed'
+  | 'mfa_enabled'
+  | 'request_received'
+  | 'saved'
+  | 'sessions_created'
+  | 'attendance_saved'
+  | 'code_opened'
+  | 'checked_in';
 
 export type FormState =
   | { status: 'idle' }
-  | { status: 'error'; code: FormErrorCode; fieldErrors?: Record<string, FieldErrorCode[]> }
+  | { status: 'error'; code: FormErrorCode; fieldErrors?: Record<string, FieldErrorCode[]>; data?: Record<string, string> }
   | { status: 'success'; code: SuccessCode; data?: Record<string, string> };
 
 /** Итог use case: состояние формы или перенаправление. */

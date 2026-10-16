@@ -1,4 +1,4 @@
-# Схема базы данных (этапы 2–5)
+# Схема базы данных (этапы 2–6)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -12,6 +12,7 @@
 | `20261015100500_account_security` (этап 3) | MFA (`aal2`) для управления ролями, опекунством и организациями; `accept_invitation()`; приглашение директора владельцем платформы; `rate_limits` + `hit_rate_limit()`; `list_my_sessions()`; `consents` (append-only); `audit_logs.subject_profile_id` + чтение событий о себе |
 | `20261016100000_public_site` (этап 4) | права `site.manage` / `lead.read` / `lead.manage`; контакты филиалов, публичная цена курса; `teacher_public_profiles` (публикует только сам преподаватель); `public_pages`; `legal_documents` (версии, опубликованная неизменна); `trial_slots`; `lead_requests` + `submit_lead_request()` (только service role); 7 функций `public_*` для анонимного чтения; согласия привязаны к школе и актуальным версиям |
 | `20261017100000_lms` (этап 5) | модули, уроки, блоки урока (проверка формы по типу); тесты, вопросы и **отдельная таблица ключей** ответов; назначение тестов группам (окна `opens_at`/`due_at`), пересдачи; попытки и ответы (append-only, идемпотентность); `lesson_progress`; функции `submit_assessment_attempt`, `attempt_review`, `track_lesson`, `course_progress`, `my_editable_courses`, `my_learning_courses`; `public_catalog` дополнен расписанием и преподавателями |
+| `20261018100000_schedule_attendance` (этап 6) | право `attendance.manage` (MFA); тема и автор занятия, запрет менять отменённое и переносить проведённое; `lesson_session_changes` (append-only) и `notifications` (уведомления в кабинете, без дублей); `create_session_series`, `session_conflicts`, `schedule_window`; посещаемость: `attendance_events` (append-only), `attendance_records` (одна на «занятие + ученик»), `attendance_record_history` (append-only), `attendance_codes` (только хеш); `mark_attendance`, `open_attendance_code`, `check_in_with_code`, `ingest_attendance_event` (только service role), `confirm_camera_event` |
 
 ## 1. Таблицы
 
@@ -48,6 +49,14 @@
 - `assessment_attempts`, `attempt_answers` (append-only)
 - `lesson_progress`
 
+**Расписание и посещаемость (этап 6)**
+
+- `lesson_session_changes` (append-only)
+- `notifications`
+- `attendance_events`, `attendance_record_history` (append-only)
+- `attendance_records`
+- `attendance_codes` (без политик: доступ только через функции)
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -63,7 +72,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `attendance_events`, `attendance_records`, `attendance_record_history` | 6 | Источники посещаемости и правила подтверждения |
 | `ai_usage_events` | 7 | Модель расхода зависит от выбранного AI-провайдера |
 | `leads`, `lead_events` | 8 | CRM |
 | `price_lists`, `tariffs`, `invoice_lines`, `webhook_events`, сторнирование распределений | 9 | Полный модуль финансов и платёжный провайдер |
@@ -128,7 +136,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 212 тестов на PGlite (этап 5) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 248 тестов на PGlite (этап 6) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -179,3 +187,24 @@
 **Прогресс.** `course_progress` считается из сохранённых строк `lesson_progress` и `assessment_attempts`, отдельного счётчика нет. Завершённый урок повторным открытием не «откатывается».
 
 Тесты — `tests/security/lms.test.ts` (26), включая полный сценарий «запись → урок → тест → разбор → прогресс».
+
+## 8. Расписание и посещаемость (этап 6)
+
+**Занятия.** Двойное бронирование преподавателя и аудитории запрещают EXCLUDE-ограничения (с этапа 2); отменённые занятия слот не занимают. `create_session_series` создаёт серию по дням недели в поясе филиала (`(дата + время) at time zone пояс` — корректно при переходе на летнее время) одной транзакцией: конфликт хотя бы одного занятия откатывает всю серию и называет дату. `session_conflicts` объясняет конфликт: вид (преподаватель / аудитория) и время; название группы — только если она видна вызывающему.
+
+**Изменения и уведомления.** Триггер на `lesson_sessions` пишет каждое изменение времени, аудитории, ссылки, преподавателя или отмену в `lesson_session_changes` и создаёт уведомления ученикам группы, их опекунам и преподавателям (кроме автора). Уникальный `(recipient_id, dedupe_key)` исключает дубли. Об изменениях давно прошедших занятий не уведомляем. Получатель может менять в уведомлении только `read_at` (привилегия на столбец). Отменённое занятие изменить нельзя, проведённое — перенести.
+
+**Посещаемость**
+
+| Источник | Как попадает | Становится отметкой |
+|---|---|---|
+| Преподаватель | `mark_attendance` с 15 минут до начала до 48 часов после конца | да |
+| Сотрудник (`attendance.manage` + MFA) | `mark_attendance` в любое время после начала; изменение существующей отметки — только с причиной | да |
+| Код занятия | преподаватель открывает 6-значный код (хранится SHA-256, ≤ 20 минут); ученик вводит `check_in_with_code`, 10 попыток за 10 минут | да, если отметки ещё нет («опоздал» — позже 10 минут) |
+| Карта доступа | `ingest_attendance_event` (только service role), повтор по `idempotency_key` игнорируется | да, если отметки ещё нет |
+| Камера | `ingest_attendance_event` | **нет**: только событие; отметку создаёт человек через `confirm_camera_event` (запись хранит событие и того, кто подтвердил) |
+
+Прямые INSERT/UPDATE/DELETE отметок пользователям закрыты; удаление отметок и изменение событий и истории запрещены триггерами. Каждая версия отметки (статус, опоздание, причина, источник, автор, причина исправления) — строка `attendance_record_history`. Видят отметки ученик, его опекун, преподаватель группы и сотрудники с `group.read` в охвате.
+
+Тесты — `tests/security/attendance.test.ts` (36).
+

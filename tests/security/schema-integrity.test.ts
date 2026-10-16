@@ -35,15 +35,16 @@ describe('schema invariants (docs/architecture/DATA_MODEL.md §6)', () => {
   });
 
   it('every RLS table has at least one policy (except service-role-only tables)', async () => {
-    // rate_limits: намеренно без политик — доступ только у service role через hit_rate_limit().
-    const serviceRoleOnly = ['rate_limits'];
+    // Намеренно без политик — доступ только через функции:
+    // rate_limits — hit_rate_limit(); attendance_codes — open_attendance_code() / check_in_with_code() (хранится лишь хеш).
+    const serviceRoleOnly = ['attendance_codes', 'rate_limits'];
     const missing = await rows<{ relname: string }>(
       db,
       `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
        where n.nspname = 'public' and c.relkind = 'r'
          and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname)`,
     );
-    expect(missing.map((m) => m.relname)).toEqual(serviceRoleOnly);
+    expect(missing.map((m) => m.relname).sort()).toEqual(serviceRoleOnly);
   });
 
   it('no floating point or money columns', async () => {

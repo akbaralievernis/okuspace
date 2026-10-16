@@ -31,3 +31,20 @@ export function formatTime(locale: Locale, iso: string, timeZone: string): strin
 export function formatPrice(locale: Locale, amount: string, currency: string): string {
   return new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency, maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(Number(amount));
 }
+
+/** Заголовок дня календаря: «понедельник, 2 ноября» (дата YYYY-MM-DD без сдвига пояса). */
+export function formatDayHeading(locale: Locale, isoDate: string): string {
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number);
+  return new Intl.DateTimeFormat(intlLocale(locale), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(y!, m! - 1, d!)));
+}
+
+/** Короткая дата и время в поясе филиала: «2 нояб., 10:00». */
+export function formatShortDateTime(locale: Locale, iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone }).format(new Date(iso));
+}
+
+/** Название дня недели по ISO-номеру (1 = понедельник). */
+export function weekdayName(locale: Locale, isoDay: number): string {
+  // 2024-01-01 — понедельник.
+  return new Intl.DateTimeFormat(intlLocale(locale), { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, isoDay)));
+}

@@ -37,7 +37,13 @@ export type FieldErrorCode =
   | 'accepted_invalid'
   | 'url_invalid'
   | 'vocabulary_invalid'
-  | 'duplicate';
+  | 'duplicate'
+  | 'time_invalid'
+  | 'weekdays_required'
+  | 'place_required'
+  | 'count_invalid'
+  | 'status_invalid'
+  | 'marks_required';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;
