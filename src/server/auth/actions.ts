@@ -4,6 +4,8 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { defaultLocale, isLocale, type Locale } from '@/i18n/config';
 import { logger } from '@/lib/logger';
+import { getSiteConfig } from '@/server/env';
+import { getSite } from '@/server/public/site';
 import { getCurrentUser, buildDeps, buildMemberDeps } from './session';
 import * as uc from './use-cases';
 import type { FormState, Outcome } from './use-cases';
@@ -34,8 +36,16 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
   return guarded(async () => settle(await uc.login(form, localeOf(form), await buildDeps())));
 }
 
+/** Версии документов, на которые соглашается пользователь; null — регистрация закрыта. */
+async function consentTarget(): Promise<uc.ConsentTarget | null> {
+  const site = await getSite();
+  const legal = site.ok && site.data ? site.data.legal : null;
+  if (!legal?.privacy || !legal.terms) return null;
+  return { org: getSiteConfig().SITE_ORGANIZATION_SLUG, privacy: legal.privacy, terms: legal.terms };
+}
+
 export async function registerAction(_prev: FormState, form: FormData): Promise<FormState> {
-  return guarded(async () => settle(await uc.register(form, localeOf(form), await buildDeps())));
+  return guarded(async () => settle(await uc.register(form, localeOf(form), await buildDeps(), await consentTarget())));
 }
 
 export async function forgotPasswordAction(_prev: FormState, form: FormData): Promise<FormState> {

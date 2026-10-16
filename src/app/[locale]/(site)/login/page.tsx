@@ -40,7 +40,7 @@ export default async function LoginPage({ params, searchParams }: Props) {
       }
     >
       {linkError ? (
-        <p role="alert" className="mb-4 rounded-md border border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="mb-4 rounded-md border border-danger-700 bg-danger-50 px-3 py-2 text-sm text-danger-700">
           {linkError}
         </p>
       ) : null}

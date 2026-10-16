@@ -25,7 +25,7 @@ export default async function MfaPage({ params, searchParams }: Props) {
       {status.ok ? (
         <MfaPanel locale={locale} t={t.auth} pending={t.common.pending} factorId={factorId} next={next} />
       ) : (
-        <p role="alert" className="rounded-md border border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-md border border-danger-700 bg-danger-50 px-3 py-2 text-sm text-danger-700">
           {t.auth.errors.unavailable}
         </p>
       )}

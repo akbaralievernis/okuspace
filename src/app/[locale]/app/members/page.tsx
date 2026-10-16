@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { AppHeader } from '@/components/app-header';
+import { AppHeader, appNav } from '@/components/app-header';
 import { InviteForm, MemberStatusForm, type InviteScope } from '@/features/members/forms';
 import { isLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
@@ -18,7 +18,7 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
   if (!canRead) {
     return (
       <>
-        <AppHeader locale={locale} t={t} showMembers={false} />
+        <AppHeader locale={locale} t={t} items={appNav(ctx, locale, t)} />
         <main id="main" className="mx-auto max-w-5xl px-4 py-8">
           <h1 className="text-2xl font-bold">{t.app.members.title}</h1>
           <p className="mt-4">{t.app.members.noRights}</p>
@@ -44,7 +44,7 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
 
   return (
     <>
-      <AppHeader locale={locale} t={t} showMembers />
+      <AppHeader locale={locale} t={t} items={appNav(ctx, locale, t)} />
       <main id="main" className="mx-auto max-w-5xl space-y-10 px-4 py-8">
         <h1 className="text-2xl font-bold">{t.app.members.title}</h1>
 
@@ -63,7 +63,7 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
             <div className="overflow-x-auto">
               <table className="w-full min-w-[44rem] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-300">
+                  <tr className="border-b border-border">
                     <th scope="col" className="py-2 pr-3">{t.app.members.person}</th>
                     <th scope="col" className="py-2 pr-3">{t.app.role}</th>
                     <th scope="col" className="py-2 pr-3">{t.app.branch}</th>
@@ -76,7 +76,7 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
                     const self = m.profileId === ctx.user.id;
                     const manageable = !self && canAssignRole(mine, m.role, m.organizationId, m.branchId);
                     return (
-                      <tr key={m.id} className="border-b border-gray-200 align-top">
+                      <tr key={m.id} className="border-b border-border align-top">
                         <td className="py-2 pr-3">
                           {m.fullName}
                           {self ? ` (${t.app.members.self})` : ''}

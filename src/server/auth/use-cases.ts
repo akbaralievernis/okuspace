@@ -12,7 +12,6 @@ import {
   type FieldErrorCode,
 } from '@/lib/auth/schemas';
 import { safeNext } from '@/lib/auth/safe-redirect';
-import { CONSENT_VERSION } from '@/lib/legal';
 import type { Logger } from '@/lib/logger';
 import { canAssignRole } from '@/server/authz/check';
 import { emailLinkTypes, type AccountRepository, type AuthGateway, type RateLimiter, type SessionUser } from './ports';
@@ -31,9 +30,13 @@ export type FormErrorCode =
   | 'already_member'
   | 'weak_password'
   | 'same_password'
-  | 'link_invalid';
+  | 'link_invalid'
+  | 'registration_closed'
+  | 'slot_unavailable'
+  | 'slot_full'
+  | 'stale_form';
 
-export type SuccessCode = 'check_email' | 'password_updated' | 'signed_out_others' | 'invited' | 'status_changed' | 'mfa_enabled';
+export type SuccessCode = 'check_email' | 'password_updated' | 'signed_out_others' | 'invited' | 'status_changed' | 'mfa_enabled' | 'request_received' | 'saved';
 
 export type FormState =
   | { status: 'idle' }
@@ -121,7 +124,15 @@ export async function login(form: FormData | Record<string, unknown>, locale: Lo
   return { kind: 'redirect', to: safeNext(raw.next, locale) };
 }
 
-export async function register(form: FormData | Record<string, unknown>, locale: Locale, deps: Deps): Promise<Outcome> {
+/** Согласие при регистрации — на актуальные опубликованные документы школы; без них регистрация закрыта. */
+export interface ConsentTarget {
+  org: string;
+  privacy: string;
+  terms: string;
+}
+
+export async function register(form: FormData | Record<string, unknown>, locale: Locale, deps: Deps, consent: ConsentTarget | null): Promise<Outcome> {
+  if (!consent) return fail('registration_closed');
   const parsed = RegisterSchema.safeParse({ ...input(form), locale });
   if (!parsed.success) return fail('validation', { fieldErrors: fieldErrors(parsed.error) });
   const { email, password, fullName } = parsed.data;
@@ -135,7 +146,7 @@ export async function register(form: FormData | Record<string, unknown>, locale:
     password,
     fullName,
     locale,
-    consentVersion: CONSENT_VERSION,
+    consent,
     emailRedirectTo: `${deps.appUrl}/${locale}/auth/confirm`,
   });
   if (!result.ok) {

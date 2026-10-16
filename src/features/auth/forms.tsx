@@ -41,7 +41,7 @@ export function LoginForm({ locale, t, pending, next }: Common & { next: string 
   );
 }
 
-export function RegisterForm({ locale, t, pending }: Common) {
+export function RegisterForm({ locale, t, pending, documents }: Common & { documents: { href: string; label: string }[] }) {
   const [state, action] = useActionState(registerAction, idle);
   const m = msgs(t);
   if (state.status === 'success') return <FormMessage state={state} messages={m} />;
@@ -72,10 +72,20 @@ export function RegisterForm({ locale, t, pending }: Common) {
             aria-describedby={consentErrors ? 'consent-error' : undefined}
             className="mt-1 size-5"
           />
-          <span>{t.consent}</span>
+          <span>
+            {t.consent}{' '}
+            {documents.map((d, i) => (
+              <span key={d.href}>
+                {i > 0 ? ', ' : ''}
+                <a className="link" href={d.href} target="_blank" rel="noopener">
+                  {d.label}
+                </a>
+              </span>
+            ))}
+          </span>
         </label>
         {consentErrors ? (
-          <p id="consent-error" className="text-sm text-red-700">
+          <p id="consent-error" className="text-sm text-danger-700">
             {consentErrors.join(' ')}
           </p>
         ) : null}
@@ -152,7 +162,7 @@ export function MfaPanel({ locale, t, pending, factorId, next }: Common & { fact
         <FormMessage state={error} messages={msgs(t)} />
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-md bg-brand-700 px-4 py-2 font-medium text-white hover:bg-brand-600"
+          className="inline-flex min-h-11 items-center rounded-md bg-brand-700 px-4 py-2 font-medium text-white hover:bg-brand-800"
           onClick={async () => {
             const result = await enrollMfaAction();
             if (result.ok) setEnrolment(result);
@@ -167,7 +177,7 @@ export function MfaPanel({ locale, t, pending, factorId, next }: Common & { fact
 
   return (
     <div className="space-y-4">
-      <Image src={enrolment.qrCode} alt={t.mfaQrAlt} width={192} height={192} unoptimized className="rounded border border-gray-300 bg-white p-2" />
+      <Image src={enrolment.qrCode} alt={t.mfaQrAlt} width={192} height={192} unoptimized className="rounded border border-border bg-surface p-2" />
       <p className="text-sm">
         {t.mfaSecret}: <code className="break-all font-mono">{enrolment.secret}</code>
       </p>

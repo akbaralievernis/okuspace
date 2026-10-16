@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
+// В e2e база недоступна: заголовок — запасное название, плюс уведомление «временно недоступно».
 const locales = [
-  { code: 'ky', heading: 'Okuspace', status: 'Платформа иштелип чыгууда' },
-  { code: 'ru', heading: 'Okuspace', status: 'Платформа в разработке' },
-  { code: 'en', heading: 'Okuspace', status: 'Platform under development' },
+  { code: 'ky', heading: 'Тил мектеби', status: 'Платформа иштелип чыгууда' },
+  { code: 'ru', heading: 'Языковая школа', status: 'Платформа в разработке' },
+  { code: 'en', heading: 'Language school', status: 'Platform under development' },
 ] as const;
 
 for (const { code, heading, status } of locales) {

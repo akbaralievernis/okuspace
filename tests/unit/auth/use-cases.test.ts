@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as uc from '@/server/auth/use-cases';
 import { hashToken } from '@/server/auth/use-cases';
-import { CONSENT_VERSION } from '@/lib/legal';
 import { BRANCH_A1, BRANCH_A2, ORG, USER, adminA1, brokenLimiter, deps, fakeGateway, fakeRepo, memberDeps, memoryLimiter } from './fakes';
 
 const valid = { email: 'User@Example.test ', password: 'correct horse battery' };
@@ -58,10 +57,11 @@ describe('login', () => {
 });
 
 describe('register', () => {
+  const consent = { org: 'school-a', privacy: '2026-10-15', terms: '2026-10-01' };
   const form = { fullName: 'Айгуль Асанова', email: 'new@example.test', password: 'long enough secret', consent: 'on' };
 
   it('requires consent, a name and a strong enough password', async () => {
-    const out = await uc.register({ fullName: '', email: 'x', password: 'short' }, 'ru', deps());
+    const out = await uc.register({ fullName: '', email: 'x', password: 'short' }, 'ru', deps(), consent);
     expect(out.kind === 'state' && out.state.status === 'error' && out.state.fieldErrors).toEqual({
       fullName: ['name_required'],
       email: ['email_invalid'],
@@ -71,32 +71,38 @@ describe('register', () => {
   });
 
   it('rejects a password equal to the email', async () => {
-    const out = await uc.register({ ...form, password: 'new@example.test' }, 'ru', deps());
+    const out = await uc.register({ ...form, password: 'new@example.test' }, 'ru', deps(), consent);
     expect(out.kind === 'state' && out.state.status === 'error' && out.state.fieldErrors?.password).toEqual(['password_same_as_email']);
   });
 
   it('passes locale, consent version and the confirmation URL to Auth; grants no role', async () => {
     const d = deps();
-    expect(successCode(await uc.register(form, 'ky', d))).toBe('check_email');
+    expect(successCode(await uc.register(form, 'ky', d, consent))).toBe('check_email');
     expect(d.gateway.signUp).toHaveBeenCalledWith({
       email: 'new@example.test',
       password: form.password,
       fullName: form.fullName,
       locale: 'ky',
-      consentVersion: CONSENT_VERSION,
+      consent,
       emailRedirectTo: 'https://okuspace.example.test/ky/auth/confirm',
     });
   });
 
   it('answers identically when the email is already registered (no enumeration)', async () => {
     const d = deps({ gateway: fakeGateway({ signUp: async () => ({ ok: false, reason: 'unknown' }) }) });
-    expect(await uc.register(form, 'ru', d)).toEqual(await uc.register(form, 'ru', deps()));
+    expect(await uc.register(form, 'ru', d, consent)).toEqual(await uc.register(form, 'ru', deps(), consent));
+  });
+
+  it('is closed until the school publishes its privacy policy and terms', async () => {
+    const d = deps();
+    expect(errorCode(await uc.register(form, 'ru', d, null))).toBe('registration_closed');
+    expect(d.gateway.signUp).not.toHaveBeenCalled();
   });
 
   it('limits registrations per IP', async () => {
     const limiter = memoryLimiter();
-    for (let i = 0; i < 5; i++) await uc.register({ ...form, email: `u${i}@example.test` }, 'ru', deps({ limiter }));
-    expect(errorCode(await uc.register(form, 'ru', deps({ limiter })))).toBe('rate_limited');
+    for (let i = 0; i < 5; i++) await uc.register({ ...form, email: `u${i}@example.test` }, 'ru', deps({ limiter }), consent);
+    expect(errorCode(await uc.register(form, 'ru', deps({ limiter }), consent))).toBe('rate_limited');
   });
 });
 

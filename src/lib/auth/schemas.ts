@@ -13,7 +13,21 @@ export type FieldErrorCode =
   | 'consent_required'
   | 'code_invalid'
   | 'role_invalid'
-  | 'reason_required';
+  | 'reason_required'
+  | 'contact_required'
+  | 'phone_invalid'
+  | 'message_too_long'
+  | 'slot_required'
+  | 'title_required'
+  | 'body_required'
+  | 'body_too_short'
+  | 'version_invalid'
+  | 'start_invalid'
+  | 'start_past'
+  | 'duration_invalid'
+  | 'capacity_invalid'
+  | 'display_name_required'
+  | 'languages_invalid';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;

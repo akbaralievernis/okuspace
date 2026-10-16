@@ -104,13 +104,22 @@ export function createSupabaseGateway(client: SupabaseClient): AuthGateway {
       }
     },
 
-    signUp: async ({ email, password, fullName, locale, consentVersion, emailRedirectTo }) =>
+    signUp: async ({ email, password, fullName, locale, consent, emailRedirectTo }) =>
       unit(
         await attempt(() =>
           client.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo, data: { full_name: fullName, locale, consent_version: consentVersion } },
+            options: {
+              emailRedirectTo,
+              data: {
+                full_name: fullName,
+                locale,
+                consent_org: consent.org,
+                consent_privacy_version: consent.privacy,
+                consent_terms_version: consent.terms,
+              },
+            },
           }),
         ),
       ),

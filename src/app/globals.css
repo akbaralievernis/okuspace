@@ -1,24 +1,93 @@
 @import 'tailwindcss';
 
-/* Базовые токены. Полноценная дизайн-система — этап 4. */
+/*
+ * Дизайн-система Okuspace (этап 4). Токены — единственный источник цветов и размеров:
+ * в компонентах используются только эти имена (bg-brand-700, text-muted и т. д.).
+ * Контраст пар «текст / фон» проверен по WCAG 2.2 AA (≥ 4.5:1 для обычного текста):
+ *   ink #111827 / surface #ffffff ......... 17.7:1
+ *   muted #4b5563 / surface ............... 7.6:1
+ *   brand-700 #0f766e / surface ........... 5.5:1   (ссылки, основные кнопки: белый текст на brand-700 — 5.5:1)
+ *   brand-800 #115e59 / brand-50 #f0fdfa .. 7.2:1
+ *   danger-700 #b91c1c / danger-50 ........ 5.9:1
+ *   success-800 #166534 / success-50 ...... 6.8:1
+ *   warning-800 #92400e / warning-50 ...... 6.9:1
+ * Проверяется автоматически axe-core в e2e (tests/e2e/a11y.spec.ts).
+ */
 @theme {
-  --color-brand-600: #1d4ed8;
-  --color-brand-700: #1e40af;
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+
+  --color-accent-100: #fef3c7;
+  --color-accent-500: #f59e0b;
+
   --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-border: #cbd5e1;
+  --color-border-strong: #64748b;
   --color-ink: #111827;
   --color-muted: #4b5563;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-success-50: #f0fdf4;
+  --color-success-800: #166534;
+  --color-warning-50: #fffbeb;
+  --color-warning-800: #92400e;
+  --color-info-50: #eff6ff;
+  --color-info-800: #1e40af;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
 }
 
 @layer base {
   html {
     color-scheme: light;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-surface text-ink antialiased;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  h1,
+  h2,
+  h3 {
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+  a {
+    text-underline-offset: 0.2em;
   }
   :focus-visible {
-    outline: 3px solid var(--color-brand-600);
+    outline: 3px solid var(--color-brand-700);
     outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Контейнер страницы: единые поля 16px на телефоне, 24px на планшете. */
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+  .link {
+    @apply text-brand-700 underline hover:text-brand-900;
+  }
+  dialog::backdrop {
+    background: rgb(17 24 39 / 0.5);
   }
 }

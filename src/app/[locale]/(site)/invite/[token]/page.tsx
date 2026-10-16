@@ -26,7 +26,7 @@ export default async function InvitePage({ params }: { params: Promise<{ locale:
             <Link className="inline-flex min-h-11 items-center rounded-md bg-brand-700 px-4 font-medium text-white" href={`/${locale}/login?next=${here}`}>
               {t.nav.signIn}
             </Link>
-            <Link className="inline-flex min-h-11 items-center rounded-md border border-gray-400 px-4" href={`/${locale}/register`}>
+            <Link className="inline-flex min-h-11 items-center rounded-md border border-border-strong px-4" href={`/${locale}/register`}>
               {t.nav.register}
             </Link>
           </p>

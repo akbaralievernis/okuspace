@@ -21,3 +21,12 @@ export function getServerEnv(): ServerEnv {
   });
   return cached;
 }
+
+export const siteConfigSchema = z.object({
+  SITE_ORGANIZATION_SLUG: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(63),
+});
+
+/** Какую школу показывает публичный сайт (slug из public.organizations). Не секрет, но и не нужен браузеру. */
+export function getSiteConfig(): z.infer<typeof siteConfigSchema> {
+  return parseEnv('site', siteConfigSchema, { SITE_ORGANIZATION_SLUG: process.env.SITE_ORGANIZATION_SLUG });
+}

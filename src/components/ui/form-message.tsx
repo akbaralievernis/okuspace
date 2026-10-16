@@ -8,14 +8,14 @@ export type AuthMessages = Pick<Dictionary['auth'], 'errors' | 'fieldErrors' | '
 export function FormMessage({ state, messages }: { state: FormState; messages: AuthMessages }) {
   if (state.status === 'error') {
     return (
-      <p role="alert" className="rounded-md border border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
+      <p role="alert" className="rounded-md border border-danger-700 bg-danger-50 px-3 py-2 text-sm text-danger-700">
         {messages.errors[state.code]}
       </p>
     );
   }
   if (state.status === 'success') {
     return (
-      <p role="status" className="rounded-md border border-green-700 bg-green-50 px-3 py-2 text-sm text-green-900">
+      <p role="status" className="rounded-md border border-success-800 bg-success-50 px-3 py-2 text-sm text-success-800">
         {fmt(messages.success[state.code], state.data ?? {})}
       </p>
     );

@@ -32,20 +32,23 @@ export const permissions = [
   'finance.write',
   'finance.refund',
   'audit.read',
+  'site.manage',
+  'lead.read',
+  'lead.manage',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
 export const rolePermissions: Record<Role, readonly Permission[]> = {
   org_director: [
     'org.manage', 'branch.manage', 'member.read', 'member.manage', 'catalog.manage', 'group.read', 'group.manage',
-    'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read',
+    'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read', 'site.manage', 'lead.read', 'lead.manage',
   ],
   branch_manager: [
     'branch.manage', 'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage',
-    'enrollment.manage', 'learning.read_all', 'finance.read',
+    'enrollment.manage', 'learning.read_all', 'finance.read', 'lead.read', 'lead.manage',
   ],
-  admin: ['member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage', 'enrollment.manage'],
-  sales_manager: ['member.read', 'member.manage', 'group.read', 'enrollment.manage'],
+  admin: ['member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage', 'enrollment.manage', 'lead.read', 'lead.manage'],
+  sales_manager: ['member.read', 'member.manage', 'group.read', 'enrollment.manage', 'lead.read', 'lead.manage'],
   accountant: ['member.read', 'group.read', 'finance.read', 'finance.write', 'finance.refund'],
   // Права этих ролей определяются связями (группа, запись, опекунство), а не матрицей.
   teacher: [],
@@ -70,4 +73,4 @@ export const roleGrants: Record<Role, readonly Role[]> = {
 };
 
 /** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006). */
-export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund'];
+export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage'];

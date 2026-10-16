@@ -49,14 +49,13 @@ test('login keeps the next target only when it is an in-app path', async ({ page
   await expect(page.locator('input[name="next"]')).toHaveValue('/ru/app/members');
 });
 
-test('registration requires consent and a long enough password', async ({ page }) => {
+test('registration stays closed while the school documents are not available', async ({ page }) => {
+  // В e2e нет БД → документы школы недоступны → форма регистрации не показывается.
+  // Валидация самой формы — unit-тесты register (tests/unit/auth/use-cases.test.ts).
   await page.goto('/en/register');
-  await page.getByLabel('Full name').fill('Test Student');
-  await page.getByLabel('Email').fill('student@example.test');
-  await page.getByLabel('Password').fill('short');
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByText('The password must be at least 10 characters.')).toBeVisible();
-  await expect(page.getByText('You cannot sign up without consent.')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Sign up' })).toBeVisible();
+  await expect(page.getByLabel('Password')).toHaveCount(0);
+  await expect(page.getByRole('main').getByText('temporarily unavailable')).toBeVisible();
 });
 
 test('password recovery validates the email', async ({ page }) => {

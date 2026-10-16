@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useMemo, useState } from 'react';
+import { ConfirmSubmit } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/ui/field';
 import { FormMessage, fieldMessages, type AuthMessages } from '@/components/ui/form-message';
 import { SubmitButton } from '@/components/ui/submit-button';
@@ -37,7 +38,7 @@ export function InviteForm({ locale, scopes, t, pending }: { locale: Locale; sco
       <input type="hidden" name="branchId" value={scope.branchId ?? ''} />
       <FormMessage state={state} messages={messages} />
       {state.status === 'success' && state.data?.link ? (
-        <div className="rounded-md border border-gray-300 bg-gray-50 p-3 text-sm">
+        <div className="rounded-md border border-border bg-surface-muted p-3 text-sm">
           <p>{t.app.members.inviteLinkLabel}</p>
           <code className="mt-1 block break-all font-mono">{state.data.link}</code>
         </div>
@@ -48,7 +49,7 @@ export function InviteForm({ locale, scopes, t, pending }: { locale: Locale; sco
         </label>
         <select
           id="invite-scope"
-          className="block min-h-11 w-full rounded-md border border-gray-400 px-3"
+          className="block min-h-11 w-full rounded-md border border-border-strong px-3"
           value={scopeKey}
           onChange={(e) => setScopeKey(Number(e.target.value))}
         >
@@ -63,7 +64,7 @@ export function InviteForm({ locale, scopes, t, pending }: { locale: Locale; sco
         <label htmlFor="invite-role" className="block text-sm font-medium">
           {t.app.role}
         </label>
-        <select id="invite-role" name="role" required className="block min-h-11 w-full rounded-md border border-gray-400 px-3">
+        <select id="invite-role" name="role" required className="block min-h-11 w-full rounded-md border border-border-strong px-3">
           {roles.map((r) => (
             <option key={r} value={r}>
               {t.roles[r]}
@@ -98,13 +99,7 @@ export function MemberStatusForm({
   const label = target === 'active' ? t.app.members.restore : target === 'blocked' ? t.app.members.block : t.app.members.revoke;
   const reasonId = `reason-${membershipId}-${target}`;
   return (
-    <form
-      action={action}
-      className="flex flex-wrap items-end gap-2"
-      onSubmit={(e) => {
-        if (!window.confirm(fmt(t.app.members.confirm, { action: label, name }))) e.preventDefault();
-      }}
-    >
+    <form action={action} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="membershipId" value={membershipId} />
       <input type="hidden" name="status" value={target} />
@@ -119,13 +114,23 @@ export function MemberStatusForm({
             required
             minLength={3}
             placeholder={t.app.members.reason}
-            className="min-h-11 w-40 rounded-md border border-gray-400 px-2"
+            className="min-h-11 w-40 rounded-md border border-border-strong px-2"
           />
         </span>
       ) : null}
-      <SubmitButton pendingLabel={pending} variant={target === 'active' ? 'secondary' : 'danger'}>
-        {label}
-      </SubmitButton>
+      {target === 'active' ? (
+        <SubmitButton pendingLabel={pending} variant="secondary">
+          {label}
+        </SubmitButton>
+      ) : (
+        <ConfirmSubmit
+          label={label}
+          title={fmt(t.app.members.confirm, { action: label, name })}
+          confirmLabel={label}
+          cancelLabel={t.admin.common.cancel}
+          variant="danger"
+        />
+      )}
       {state.status !== 'idle' ? <FormMessage state={state} messages={messages} /> : null}
     </form>
   );

@@ -41,6 +41,6 @@ describe('TypeScript RBAC mirror matches the database', () => {
     for (const p of policies.filter((x) => (x.with_check ?? '').length > 0)) {
       expect(`${p.tablename}: ${p.with_check}`).toMatch(/aal2|can_assign_role/);
     }
-    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund']);
+    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage']);
   });
 });

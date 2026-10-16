@@ -24,7 +24,7 @@ export function LanguageSwitcher({ current, label }: { current: Locale; label: s
                 lang={locale}
                 aria-current={active ? 'true' : undefined}
                 className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm ${
-                  active ? 'bg-brand-700 text-white' : 'text-ink hover:bg-gray-100'
+                  active ? 'bg-brand-700 text-white' : 'text-ink hover:bg-surface-muted'
                 }`}
               >
                 {localeNames[locale]}

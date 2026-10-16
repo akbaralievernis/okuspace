@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { AppHeader } from '@/components/app-header';
+import { AppHeader, appNav } from '@/components/app-header';
 import { SignOutOthersForm } from '@/features/members/forms';
 import { isLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { fmt } from '@/lib/format';
-import { can } from '@/server/authz/check';
 import { requireAccess } from '@/server/auth/session';
 import { mySecurityEvents, mySessions } from '@/server/queries/workspace';
 
@@ -15,12 +14,11 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   const ctx = await requireAccess(locale, `/${locale}/app/account`);
   const t = getDictionary(locale);
   const [sessions, events] = await Promise.all([mySessions(), mySecurityEvents(ctx.user.id)]);
-  const showMembers = ctx.memberships.some((m) => can(ctx.memberships, 'member.read', m.organizationId, m.branchId));
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
 
   return (
     <>
-      <AppHeader locale={locale} t={t} showMembers={showMembers} />
+      <AppHeader locale={locale} t={t} items={appNav(ctx, locale, t)} />
       <main id="main" className="mx-auto max-w-5xl space-y-10 px-4 py-8">
         <h1 className="text-2xl font-bold">{t.app.account.title}</h1>
 

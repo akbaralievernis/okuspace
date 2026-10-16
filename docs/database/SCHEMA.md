@@ -10,6 +10,7 @@
 | `20261015100300_learning` | задания и работы учеников |
 | `20261015100400_finance` | счета, платежи и возвраты, распределения, представление `invoice_balances` |
 | `20261015100500_account_security` (этап 3) | MFA (`aal2`) для управления ролями, опекунством и организациями; `accept_invitation()`; приглашение директора владельцем платформы; `rate_limits` + `hit_rate_limit()`; `list_my_sessions()`; `consents` (append-only); `audit_logs.subject_profile_id` + чтение событий о себе |
+| `20261016100000_public_site` (этап 4) | права `site.manage` / `lead.read` / `lead.manage`; контакты филиалов, публичная цена курса; `teacher_public_profiles` (публикует только сам преподаватель); `public_pages`; `legal_documents` (версии, опубликованная неизменна); `trial_slots`; `lead_requests` + `submit_lead_request()` (только service role); 7 функций `public_*` для анонимного чтения; согласия привязаны к школе и актуальным версиям |
 
 ## 1. Таблицы
 
@@ -122,3 +123,19 @@
 - `tests/security/*.test.ts`: 118 тестов на PGlite (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
+
+## 6. Публичный доступ (этап 4)
+
+Аноним **не имеет** привилегий на таблицы. Публичный сайт читает данные только через функции:
+
+- `public_site`
+- `public_catalog`
+- `public_levels`
+- `public_teachers`
+- `public_trial_slots`
+- `public_page`
+- `public_legal`
+
+Каждая получает slug школы. Функции возвращают только опубликованные записи активной школы и только безопасные поля: никаких email и id людей. Тесты — `tests/security/public-site.test.ts` и `tests/integration/public-site.test.ts` (совместимость с TS-схемами сайта).
+
+После этапа 4 в схеме 33 таблицы и 83 политики RLS.

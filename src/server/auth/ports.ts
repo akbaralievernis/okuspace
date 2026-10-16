@@ -36,7 +36,14 @@ export interface MfaStatus {
 
 export interface AuthGateway {
   getUser(): Promise<SessionUser | null>;
-  signUp(input: { email: string; password: string; fullName: string; locale: string; consentVersion: string; emailRedirectTo: string }): Promise<AuthResult>;
+  signUp(input: {
+    email: string;
+    password: string;
+    fullName: string;
+    locale: string;
+    consent: { org: string; privacy: string; terms: string };
+    emailRedirectTo: string;
+  }): Promise<AuthResult>;
   signIn(input: { email: string; password: string }): Promise<AuthResult>;
   signOut(scope: 'local' | 'others' | 'global'): Promise<AuthResult>;
   sendPasswordReset(email: string, redirectTo: string): Promise<AuthResult>;
@@ -77,7 +84,17 @@ export interface AccountRepository {
   setMembershipStatus(membershipId: string, status: 'active' | 'blocked' | 'revoked', reason: string | null): Promise<RepoWrite>;
 }
 
-export type RateBucket = 'login_ip' | 'login_email' | 'register_ip' | 'reset_ip' | 'reset_email' | 'invite_user' | 'mfa_user' | 'accept_user';
+export type RateBucket =
+  | 'login_ip'
+  | 'login_email'
+  | 'register_ip'
+  | 'reset_ip'
+  | 'reset_email'
+  | 'invite_user'
+  | 'mfa_user'
+  | 'accept_user'
+  | 'lead_ip'
+  | 'lead_contact';
 
 export interface RateLimiter {
   /** true — запрос разрешён; false — лимит исчерпан. Бросает исключение, если хранилище недоступно. */

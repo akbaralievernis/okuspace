@@ -216,41 +216,65 @@ describe('list_my_sessions', () => {
 });
 
 describe('registration: profile, locale and consents', () => {
-  const register = (meta: Record<string, unknown>) =>
+  const LEGAL_BODY = 'Текст документа. '.repeat(10);
+  const register = (meta: Record<string, unknown>, opts: { publish?: boolean } = { publish: true }) =>
     db.transaction(async (tx) => {
+      if (opts.publish) {
+        await tx.query(
+          `insert into public.legal_documents (organization_id, kind, locale, version, title, body, status) values
+           ($1, 'privacy', 'ru', '2026-10-15', 'Политика', $2, 'published'), ($1, 'terms', 'ru', '2026-10-15', 'Правила', $2, 'published')`,
+          [ORG.A, LEGAL_BODY],
+        );
+      }
       const { rows: r } = await tx.query<{ id: string }>(
         `insert into auth.users (email, raw_user_meta_data) values ('new.user@example.test', $1) returning id`,
         [JSON.stringify(meta)],
       );
       const id = r[0]!.id;
       const profile = await rows<{ full_name: string; locale: string }>(tx, 'select full_name, locale from public.profiles where id = $1', [id]);
-      const consents = await rows<{ kind: string; version: string }>(tx, 'select kind, version from public.consents where profile_id = $1 order by kind', [id]);
+      const consents = await rows<{ kind: string; version: string; organization_id: string }>(
+        tx,
+        'select kind, version, organization_id from public.consents where profile_id = $1 order by kind',
+        [id],
+      );
       const memberships = await count(tx, 'select 1 from public.memberships where profile_id = $1', [id]);
       await tx.rollback();
       return { profile: profile[0], consents, memberships };
     });
 
-  it('records consents and locale from sign-up metadata and grants no roles', async () => {
-    const r = await register({ full_name: 'Айгуль', locale: 'ky', consent_version: '2026-10-15' });
+  const consentMeta = { consent_org: 'school-a', consent_privacy_version: '2026-10-15', consent_terms_version: '2026-10-15' };
+
+  it("records consents to the school's current documents and locale, and grants no roles", async () => {
+    const r = await register({ full_name: 'Айгуль', locale: 'ky', ...consentMeta });
     expect(r.profile).toEqual({ full_name: 'Айгуль', locale: 'ky' });
     expect(r.consents).toEqual([
-      { kind: 'privacy_policy', version: '2026-10-15' },
-      { kind: 'terms', version: '2026-10-15' },
+      { kind: 'privacy_policy', version: '2026-10-15', organization_id: ORG.A },
+      { kind: 'terms', version: '2026-10-15', organization_id: ORG.A },
     ]);
     expect(r.memberships).toBe(0);
   });
 
-  it('ignores invalid locale and consent values from the client', async () => {
-    const r = await register({ full_name: 'X', locale: 'de', consent_version: 'yes' });
+  it('ignores invalid locale and outdated or unknown consent versions', async () => {
+    const r = await register({ full_name: 'X', locale: 'de', ...consentMeta, consent_privacy_version: '2026-01-01' });
     expect(r.profile?.locale).toBe('ru');
     expect(r.consents).toEqual([]);
+    expect((await register({ full_name: 'X', ...consentMeta, consent_org: 'no-such-school' })).consents).toEqual([]);
+  });
+
+  it('records no consent while the school has not published its documents', async () => {
+    expect((await register({ full_name: 'X', ...consentMeta }, { publish: false })).consents).toEqual([]);
   });
 
   it('consents are append-only and private', async () => {
     await expectDenied(
       asService(db, async (tx) => {
         await tx.exec('reset role');
-        await tx.query(`insert into auth.users (email, raw_user_meta_data) values ('c@example.test', '{"consent_version": "2026-10-15"}')`);
+        await tx.query(
+          `insert into public.legal_documents (organization_id, kind, locale, version, title, body, status) values
+           ($1, 'privacy', 'ru', '2026-10-15', 'Политика', $2, 'published'), ($1, 'terms', 'ru', '2026-10-15', 'Правила', $2, 'published')`,
+          [ORG.A, LEGAL_BODY],
+        );
+        await tx.query(`insert into auth.users (email, raw_user_meta_data) values ('c@example.test', $1)`, [JSON.stringify(consentMeta)]);
         await tx.exec('set local role service_role');
         expect(await count(tx, 'select 1 from public.consents')).toBe(2);
         await tx.query('delete from public.consents');
