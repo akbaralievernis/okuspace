@@ -36,7 +36,16 @@ export type FormErrorCode =
   | 'slot_full'
   | 'stale_form'
   | 'no_attempts_left'
-  | 'schedule_conflict';
+  | 'schedule_conflict'
+  | 'ai_disabled'
+  | 'ai_unavailable'
+  | 'ai_timeout'
+  | 'ai_rate_limited'
+  | 'ai_daily_limit'
+  | 'ai_budget'
+  | 'ai_refused'
+  | 'ai_invalid_output'
+  | 'ai_input_too_long';
 
 export type SuccessCode =
   | 'check_email'
@@ -50,7 +59,8 @@ export type SuccessCode =
   | 'sessions_created'
   | 'attendance_saved'
   | 'code_opened'
-  | 'checked_in';
+  | 'checked_in'
+  | 'practice_checked';
 
 export type FormState =
   | { status: 'idle' }

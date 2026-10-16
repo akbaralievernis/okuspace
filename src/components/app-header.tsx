@@ -22,6 +22,7 @@ export function appNav(ctx: AccessContext, locale: Locale, t: Dictionary): AppNa
   const role = (r: string) => m.some((x) => x.role === r && x.status === 'active');
   const items: AppNavItem[] = [{ href: href(''), label: t.nav.workspace }];
   if (m.some((x) => x.status === 'active')) items.push({ href: href('/schedule'), label: t.schedule.nav });
+  if (m.some((x) => x.status === 'active')) items.push({ href: href('/ai'), label: t.ai.nav });
   if (role('student') || role('parent')) items.push({ href: href('/learn'), label: t.lms.nav.learn });
   if (role('teacher') || orgScope('catalog.manage')) items.push({ href: href('/courses'), label: t.lms.nav.courses });
   if (role('teacher') || anyScope('group.read')) items.push({ href: href('/groups'), label: t.lms.nav.groups });

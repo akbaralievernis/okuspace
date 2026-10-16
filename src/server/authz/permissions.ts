@@ -36,6 +36,7 @@ export const permissions = [
   'lead.read',
   'lead.manage',
   'attendance.manage',
+  'ai.manage',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -43,7 +44,7 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
   org_director: [
     'org.manage', 'branch.manage', 'member.read', 'member.manage', 'catalog.manage', 'group.read', 'group.manage',
     'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read', 'site.manage', 'lead.read', 'lead.manage',
-    'attendance.manage',
+    'attendance.manage', 'ai.manage',
   ],
   branch_manager: [
     'branch.manage', 'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage',
@@ -77,5 +78,5 @@ export const roleGrants: Record<Role, readonly Role[]> = {
   parent: [],
 };
 
-/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009). */
-export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage'];
+/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009–0010). */
+export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage'];

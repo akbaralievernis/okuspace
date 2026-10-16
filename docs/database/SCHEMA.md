@@ -1,4 +1,4 @@
-# Схема базы данных (этапы 2–6)
+# Схема базы данных (этапы 2–7)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -13,6 +13,7 @@
 | `20261016100000_public_site` (этап 4) | права `site.manage` / `lead.read` / `lead.manage`; контакты филиалов, публичная цена курса; `teacher_public_profiles` (публикует только сам преподаватель); `public_pages`; `legal_documents` (версии, опубликованная неизменна); `trial_slots`; `lead_requests` + `submit_lead_request()` (только service role); 7 функций `public_*` для анонимного чтения; согласия привязаны к школе и актуальным версиям |
 | `20261017100000_lms` (этап 5) | модули, уроки, блоки урока (проверка формы по типу); тесты, вопросы и **отдельная таблица ключей** ответов; назначение тестов группам (окна `opens_at`/`due_at`), пересдачи; попытки и ответы (append-only, идемпотентность); `lesson_progress`; функции `submit_assessment_attempt`, `attempt_review`, `track_lesson`, `course_progress`, `my_editable_courses`, `my_learning_courses`; `public_catalog` дополнен расписанием и преподавателями |
 | `20261018100000_schedule_attendance` (этап 6) | право `attendance.manage` (MFA); тема и автор занятия, запрет менять отменённое и переносить проведённое; `lesson_session_changes` (append-only) и `notifications` (уведомления в кабинете, без дублей); `create_session_series`, `session_conflicts`, `schedule_window`; посещаемость: `attendance_events` (append-only), `attendance_records` (одна на «занятие + ученик»), `attendance_record_history` (append-only), `attendance_codes` (только хеш); `mark_attendance`, `open_attendance_code`, `check_in_with_code`, `ingest_attendance_event` (только service role), `confirm_camera_event` |
+| `20261019100000_ai_lab` (этап 7) | право `ai.manage` (директор, MFA); `ai_settings` (AI выключен по умолчанию, бюджет, дневной лимит, голос — выключен); `ai_calls` (журнал вызовов: резерв → итог, закрывает только сервер); `ai_begin` (лимиты и бюджет под блокировкой школы), `ai_finish` (service role); `ai_conversations`, `ai_messages` (реплики ассистента — только сервер); `ai_feedback` (только сервер), `ai_feedback_disputes` (оспорить может ученик или преподаватель, решает преподаватель), `ai_practice_results` + `record_practice` (проверка в БД), `ai_lab_stats`, `ai_can_resolve` |
 
 ## 1. Таблицы
 
@@ -57,6 +58,13 @@
 - `attendance_records`
 - `attendance_codes` (без политик: доступ только через функции)
 
+**AI Language Lab (этап 7)**
+
+- `ai_settings`
+- `ai_calls` (итог неизменен, удаление запрещено)
+- `ai_conversations`, `ai_messages`
+- `ai_feedback`, `ai_feedback_disputes`, `ai_practice_results`
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -72,7 +80,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `ai_usage_events` | 7 | Модель расхода зависит от выбранного AI-провайдера |
 | `leads`, `lead_events` | 8 | CRM |
 | `price_lists`, `tariffs`, `invoice_lines`, `webhook_events`, сторнирование распределений | 9 | Полный модуль финансов и платёжный провайдер |
 | `camera_devices`, `occupancy_snapshots`, `attendance_reviews`, `monitoring_policies` | 10 | После юридической проверки |
@@ -136,7 +143,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 248 тестов на PGlite (этап 6) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 263 теста на PGlite (этап 7) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -207,4 +214,18 @@
 Прямые INSERT/UPDATE/DELETE отметок пользователям закрыты; удаление отметок и изменение событий и истории запрещены триггерами. Каждая версия отметки (статус, опоздание, причина, источник, автор, причина исправления) — строка `attendance_record_history`. Видят отметки ученик, его опекун, преподаватель группы и сотрудники с `group.read` в охвате.
 
 Тесты — `tests/security/attendance.test.ts` (36).
+
+## 9. AI Language Lab (этап 7)
+
+**Выключено по умолчанию.** AI работает, только если на сервере настроен провайдер (`AI_PROVIDER=anthropic` + ключ) **и** школа включила его в `ai_settings` (право `ai.manage`, MFA). Иначе AI-страницы показывают понятное сообщение, а уроки, тесты и домашние задания работают как обычно — они от AI не зависят.
+
+**Лимиты и бюджет — в БД.** `ai_begin` под advisory-блокировкой школы проверяет: членство, включённость, ≤ 6 вызовов в минуту и дневной лимит на человека, месячный бюджет (факт + резерв незавершённых вызовов за 15 минут). Резерв — оценка максимальной стоимости вызова; после ответа `ai_finish` записывает фактические токены и стоимость в микродолларах (целые числа). `ai_finish` доступна только service role: пользователь не может «удешевить» вызов или закрыть его за сервер. Закрытый вызов неизменен.
+
+**Приватность.** Диалоги видит только владелец (родитель и преподаватель — нет); реплики ассистента и AI-отзывы пишет только сервер. AI-отзывы видят ученик, опекун, преподаватель группы и руководство с `learning.read_all`. Персональные данные (email, телефоны, номера карт, ссылки) удаляются из текста до отправки провайдеру; сохраняется уже очищенный текст.
+
+**Оспаривание.** Любой AI-отзыв может оспорить ученик или преподаватель группы (один спор на человека). Решение («AI ошибся» / «оценка верна») с обязательным комментарием принимает преподаватель или руководство, один раз; суть спора не меняется; всё пишется в аудит.
+
+**Упражнения** проверяет БД (`record_practice`) по сохранённым ответам той же нормализацией, что тесты LMS, — модель в проверке не участвует.
+
+Тесты — `tests/security/ai-lab.test.ts` (15).
 

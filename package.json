@@ -18,9 +18,11 @@
     "check:bundle": "node scripts/check-client-bundle.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build:e2e && npm run check:bundle && npm run test:e2e",
     "build:e2e": "node scripts/with-env.mjs .env.e2e next build",
-    "start:e2e": "node scripts/with-env.mjs .env.e2e next start"
+    "start:e2e": "node scripts/with-env.mjs .env.e2e next start",
+    "eval:ai": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.135.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
     "next": "16.3.8",

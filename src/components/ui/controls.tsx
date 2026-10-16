@@ -77,8 +77,22 @@ export function TextareaField({
   );
 }
 
-export function CheckboxField({ name, label, errors, required }: { name: string; label: ReactNode; errors?: string[] | undefined; required?: boolean }) {
-  const id = `field-${name}`;
+export function CheckboxField({
+  name,
+  label,
+  errors,
+  required,
+  defaultChecked,
+  idPrefix = 'field',
+}: {
+  name: string;
+  label: ReactNode;
+  errors?: string[] | undefined;
+  required?: boolean;
+  defaultChecked?: boolean;
+  idPrefix?: string;
+}) {
+  const id = `${idPrefix}-${name}`;
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="flex items-start gap-3 text-sm">
@@ -87,6 +101,7 @@ export function CheckboxField({ name, label, errors, required }: { name: string;
           type="checkbox"
           name={name}
           required={required}
+          defaultChecked={defaultChecked}
           aria-invalid={errors?.length ? true : undefined}
           aria-describedby={errors?.length ? `${id}-error` : undefined}
           className="mt-0.5 size-5 shrink-0 accent-brand-700"
