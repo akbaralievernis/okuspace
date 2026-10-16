@@ -60,7 +60,8 @@ export type SuccessCode =
   | 'attendance_saved'
   | 'code_opened'
   | 'checked_in'
-  | 'practice_checked';
+  | 'practice_checked'
+  | 'imported';
 
 export type FormState =
   | { status: 'idle' }

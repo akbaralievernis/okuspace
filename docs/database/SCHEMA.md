@@ -1,4 +1,4 @@
-# Схема базы данных (этапы 2–7)
+# Схема базы данных (этапы 2–8)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -14,6 +14,7 @@
 | `20261017100000_lms` (этап 5) | модули, уроки, блоки урока (проверка формы по типу); тесты, вопросы и **отдельная таблица ключей** ответов; назначение тестов группам (окна `opens_at`/`due_at`), пересдачи; попытки и ответы (append-only, идемпотентность); `lesson_progress`; функции `submit_assessment_attempt`, `attempt_review`, `track_lesson`, `course_progress`, `my_editable_courses`, `my_learning_courses`; `public_catalog` дополнен расписанием и преподавателями |
 | `20261018100000_schedule_attendance` (этап 6) | право `attendance.manage` (MFA); тема и автор занятия, запрет менять отменённое и переносить проведённое; `lesson_session_changes` (append-only) и `notifications` (уведомления в кабинете, без дублей); `create_session_series`, `session_conflicts`, `schedule_window`; посещаемость: `attendance_events` (append-only), `attendance_records` (одна на «занятие + ученик»), `attendance_record_history` (append-only), `attendance_codes` (только хеш); `mark_attendance`, `open_attendance_code`, `check_in_with_code`, `ingest_attendance_event` (только service role), `confirm_camera_event` |
 | `20261019100000_ai_lab` (этап 7) | право `ai.manage` (директор, MFA); `ai_settings` (AI выключен по умолчанию, бюджет, дневной лимит, голос — выключен); `ai_calls` (журнал вызовов: резерв → итог, закрывает только сервер); `ai_begin` (лимиты и бюджет под блокировкой школы), `ai_finish` (service role); `ai_conversations`, `ai_messages` (реплики ассистента — только сервер); `ai_feedback` (только сервер), `ai_feedback_disputes` (оспорить может ученик или преподаватель, решает преподаватель), `ai_practice_results` + `record_practice` (проверка в БД), `ai_lab_stats`, `ai_can_resolve` |
+| `20261020100000_crm` (этап 8) | право `crm.admin` (директор, менеджер филиала; MFA); `crm_contacts` (нормализованный телефон, уникальность телефона/email в школе), `crm_events` (история, append-only, только обезличивание), `crm_reminders`, `crm_trial_bookings` (общие места со слотами сайта), `crm_exports` (журнал выгрузок); `lead_requests.contact_id`; `submit_lead_request` и `public_trial_slots` пересозданы: заявка сразу попадает в CRM; функции `crm_book_trial`, `crm_trial_result`, `crm_convert`, `crm_enroll`, `crm_import`, `crm_export`, `crm_erase`, `crm_purge_stale` (service role), `crm_funnel` |
 
 ## 1. Таблицы
 
@@ -65,6 +66,12 @@
 - `ai_conversations`, `ai_messages`
 - `ai_feedback`, `ai_feedback_disputes`, `ai_practice_results`
 
+**CRM (этап 8)**
+
+- `crm_contacts` (удалять нельзя — только обезличивать)
+- `crm_events` (append-only), `crm_exports` (append-only)
+- `crm_reminders`, `crm_trial_bookings`
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -80,7 +87,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `leads`, `lead_events` | 8 | CRM |
 | `price_lists`, `tariffs`, `invoice_lines`, `webhook_events`, сторнирование распределений | 9 | Полный модуль финансов и платёжный провайдер |
 | `camera_devices`, `occupancy_snapshots`, `attendance_reviews`, `monitoring_policies` | 10 | После юридической проверки |
 | `notifications`, `files`, `integrations` | 11 / 5 | Вместе с очередью уведомлений и загрузкой файлов |
@@ -143,7 +149,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 263 теста на PGlite (этап 7) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 279 тестов на PGlite (этап 8) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -228,4 +234,22 @@
 **Упражнения** проверяет БД (`record_practice`) по сохранённым ответам той же нормализацией, что тесты LMS, — модель в проверке не участвует.
 
 Тесты — `tests/security/ai-lab.test.ts` (15).
+
+## 10. CRM (этап 8)
+
+**Без дублей.** Телефон приводится к единому виду (`app.normalize_phone`: «0555 12-34-56» → `+996555123456`), email — к нижнему регистру. Уникальные индексы: один телефон и один email — один контакт школы (обезличенные не считаются). Заявка с сайта (`submit_lead_request`, этап 4) под блокировкой школы находит существующий контакт по телефону или email или создаёт новый; повторная отправка той же формы, как и раньше, возвращает ту же заявку. Импорт пропускает дубли — и с базой, и внутри файла.
+
+**История.** Смена этапа и менеджера пишется в `crm_events` триггером — изменить их без записи в историю нельзя. Звонки, сообщения, встречи и заметки сотрудник добавляет сам; системные события (этап, конверсия, запись на курс) подделать нельзя. История append-only; единственное допустимое изменение — обезличивание текста.
+
+**Этапы.** `new → contacted → trial_booked → trial_done → offer → won` и `lost` (с причиной). «Ученик» (`won`) ставится только функцией `crm_convert`: контакт связывается с учётной записью ученика того же филиала. Запись на курс — `crm_enroll` (право `enrollment.manage` в филиале группы; вместимость проверяет триггер этапа 2).
+
+**Пробные уроки.** Места слота занимают и заявки с сайта, и брони из CRM (`app.trial_slot_taken`); одна заявка с сайта и её бронь считаются одним местом.
+
+**Доступ.** Контакты, история, напоминания видны только сотрудникам с `lead.read` в филиале контакта (контакты без филиала — уровень школы). Изменения — `lead.manage` + MFA; менеджером и исполнителем напоминания можно назначить только сотрудника продаж этого филиала. Преподаватели, бухгалтеры, ученики и другие школы контакты не видят.
+
+**Экспорт** (`crm_export`) — только `crm.admin` + MFA, только свой охват, только рабочие поля (имя, телефон, email, источник, этап, филиал, менеджер, даты — без заметок и истории); каждая выгрузка пишется в `crm_exports`. В CSV формулы нейтрализуются (защита от CSV injection).
+
+**Хранение и удаление.** `crm_erase` (`crm.admin` + MFA, с основанием) обезличивает контакт: имя, телефон, email, заметки, тексты истории и напоминаний; исходные заявки с сайта удаляются. `crm_purge_stale(24)` (только service role, по расписанию — этап 13) обезличивает неконвертированные контакты без активности дольше 24 месяцев.
+
+Тесты — `tests/security/crm.test.ts` (16).
 

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppHeader, appNav } from '@/components/app-header';
 import { SelectField } from '@/components/ui/controls';
@@ -27,7 +28,7 @@ export default async function RequestsPage({ params }: { params: Promise<{ local
   const { data, error } = canRead
     ? await client
         .from('lead_requests')
-        .select('id, organization_id, branch_id, kind, full_name, phone, email, message, status, created_at, locale')
+        .select('id, organization_id, branch_id, kind, full_name, phone, email, message, status, created_at, locale, contact_id')
         .order('created_at', { ascending: false })
         .limit(100)
     : { data: [], error: null };
@@ -58,7 +59,17 @@ export default async function RequestsPage({ params }: { params: Promise<{ local
                       {r.received}: {dateFmt.format(new Date(lead.created_at as string))}
                     </span>
                   </div>
-                  <p className="font-semibold">{lead.full_name as string}</p>
+                  <p className="font-semibold">
+                    {lead.full_name as string}
+                    {lead.contact_id ? (
+                      <>
+                        {' · '}
+                        <Link className="link text-sm font-normal" href={`/${locale}/app/crm/contacts/${lead.contact_id as string}`}>
+                          {t.crm.openInCrm}
+                        </Link>
+                      </>
+                    ) : null}
+                  </p>
                   <p className="text-sm">
                     {r.contact}: {[lead.phone, lead.email].filter(Boolean).join(' · ')}
                   </p>

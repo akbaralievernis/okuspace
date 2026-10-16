@@ -28,6 +28,7 @@ export function appNav(ctx: AccessContext, locale: Locale, t: Dictionary): AppNa
   if (role('teacher') || anyScope('group.read')) items.push({ href: href('/groups'), label: t.lms.nav.groups });
   if (orgScope('catalog.manage')) items.push({ href: href('/catalog'), label: t.lms.nav.catalog });
   if (anyScope('member.read')) items.push({ href: href('/members'), label: t.nav.members });
+  if (anyScope('lead.read')) items.push({ href: href('/crm'), label: t.crm.nav });
   if (anyScope('lead.read')) items.push({ href: href('/requests'), label: t.admin.nav.requests });
   if (anyScope('schedule.manage')) items.push({ href: href('/trials'), label: t.admin.nav.trials });
   if (orgScope('site.manage')) items.push({ href: href('/site'), label: t.admin.nav.site });
