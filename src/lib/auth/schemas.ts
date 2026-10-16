@@ -27,7 +27,17 @@ export type FieldErrorCode =
   | 'duration_invalid'
   | 'capacity_invalid'
   | 'display_name_required'
-  | 'languages_invalid';
+  | 'languages_invalid'
+  | 'level_code_invalid'
+  | 'price_invalid'
+  | 'date_invalid'
+  | 'points_invalid'
+  | 'choices_invalid'
+  | 'correct_invalid'
+  | 'accepted_invalid'
+  | 'url_invalid'
+  | 'vocabulary_invalid'
+  | 'duplicate';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;

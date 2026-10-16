@@ -14,4 +14,10 @@ describe('buildCsp', () => {
   it('allows eval only in development (needed by the dev server)', () => {
     expect(buildCsp('n', { dev: true })).toContain("'unsafe-eval'");
   });
+
+  it('lesson media may come from https hosts only (no plain http, no frames)', () => {
+    const media = buildCsp('n', { dev: false }).split('; ').find((d) => d.startsWith('media-src'));
+    expect(media).toBe("media-src 'self' blob: https:");
+    expect(buildCsp('n', { dev: false })).not.toContain('frame-src');
+  });
 });

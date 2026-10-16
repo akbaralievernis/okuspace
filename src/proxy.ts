@@ -13,7 +13,8 @@ export function buildCsp(nonce: string, options: { dev: boolean; supabaseUrl?: s
     "img-src 'self' data: blob:",
     "font-src 'self'",
     `connect-src ${connect}`,
-    "media-src 'self' blob:",
+    // Медиа уроков подключаются по внешним https-ссылкам (видео/аудио не исполняют код); http запрещён.
+    "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

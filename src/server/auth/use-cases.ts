@@ -34,7 +34,8 @@ export type FormErrorCode =
   | 'registration_closed'
   | 'slot_unavailable'
   | 'slot_full'
-  | 'stale_form';
+  | 'stale_form'
+  | 'no_attempts_left';
 
 export type SuccessCode = 'check_email' | 'password_updated' | 'signed_out_others' | 'invited' | 'status_changed' | 'mfa_enabled' | 'request_received' | 'saved';
 

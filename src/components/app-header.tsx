@@ -19,12 +19,17 @@ export function appNav(ctx: AccessContext, locale: Locale, t: Dictionary): AppNa
   const anyScope = (p: Permission) => m.some((x) => can(m, p, x.organizationId, x.branchId));
   const orgScope = (p: Permission) => m.some((x) => can(m, p, x.organizationId, null));
   const href = (path: string) => `/${locale}/app${path}`;
+  const role = (r: string) => m.some((x) => x.role === r && x.status === 'active');
   const items: AppNavItem[] = [{ href: href(''), label: t.nav.workspace }];
+  if (role('student') || role('parent')) items.push({ href: href('/learn'), label: t.lms.nav.learn });
+  if (role('teacher') || orgScope('catalog.manage')) items.push({ href: href('/courses'), label: t.lms.nav.courses });
+  if (role('teacher') || anyScope('group.read')) items.push({ href: href('/groups'), label: t.lms.nav.groups });
+  if (orgScope('catalog.manage')) items.push({ href: href('/catalog'), label: t.lms.nav.catalog });
   if (anyScope('member.read')) items.push({ href: href('/members'), label: t.nav.members });
   if (anyScope('lead.read')) items.push({ href: href('/requests'), label: t.admin.nav.requests });
   if (anyScope('schedule.manage')) items.push({ href: href('/trials'), label: t.admin.nav.trials });
   if (orgScope('site.manage')) items.push({ href: href('/site'), label: t.admin.nav.site });
-  if (m.some((x) => x.role === 'teacher' && x.status === 'active')) items.push({ href: href('/profile'), label: t.admin.nav.publicProfile });
+  if (role('teacher')) items.push({ href: href('/profile'), label: t.admin.nav.publicProfile });
   items.push({ href: href('/account'), label: t.nav.account });
   return items;
 }

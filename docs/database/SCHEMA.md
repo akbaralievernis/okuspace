@@ -1,4 +1,4 @@
-# Схема базы данных (этап 2)
+# Схема базы данных (этапы 2–5)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -11,6 +11,7 @@
 | `20261015100400_finance` | счета, платежи и возвраты, распределения, представление `invoice_balances` |
 | `20261015100500_account_security` (этап 3) | MFA (`aal2`) для управления ролями, опекунством и организациями; `accept_invitation()`; приглашение директора владельцем платформы; `rate_limits` + `hit_rate_limit()`; `list_my_sessions()`; `consents` (append-only); `audit_logs.subject_profile_id` + чтение событий о себе |
 | `20261016100000_public_site` (этап 4) | права `site.manage` / `lead.read` / `lead.manage`; контакты филиалов, публичная цена курса; `teacher_public_profiles` (публикует только сам преподаватель); `public_pages`; `legal_documents` (версии, опубликованная неизменна); `trial_slots`; `lead_requests` + `submit_lead_request()` (только service role); 7 функций `public_*` для анонимного чтения; согласия привязаны к школе и актуальным версиям |
+| `20261017100000_lms` (этап 5) | модули, уроки, блоки урока (проверка формы по типу); тесты, вопросы и **отдельная таблица ключей** ответов; назначение тестов группам (окна `opens_at`/`due_at`), пересдачи; попытки и ответы (append-only, идемпотентность); `lesson_progress`; функции `submit_assessment_attempt`, `attempt_review`, `track_lesson`, `course_progress`, `my_editable_courses`, `my_learning_courses`; `public_catalog` дополнен расписанием и преподавателями |
 
 ## 1. Таблицы
 
@@ -39,6 +40,14 @@
 - `assignments`
 - `assignment_submissions`
 
+**Контент курса и оценивание (этап 5)**
+
+- `course_modules`, `lessons`, `lesson_blocks`
+- `assessments`, `assessment_questions`, `assessment_answer_keys`
+- `group_assessments`, `assessment_retakes`
+- `assessment_attempts`, `attempt_answers` (append-only)
+- `lesson_progress`
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -54,7 +63,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `course_modules`, `lessons`, `lesson_materials`, `assessments`, `assessment_attempts`, `lesson_progress` | 5 | Структура контента уточняется вместе с LMS |
 | `attendance_events`, `attendance_records`, `attendance_record_history` | 6 | Источники посещаемости и правила подтверждения |
 | `ai_usage_events` | 7 | Модель расхода зависит от выбранного AI-провайдера |
 | `leads`, `lead_events` | 8 | CRM |
@@ -120,7 +128,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 118 тестов на PGlite (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 212 тестов на PGlite (этап 5) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -139,3 +147,35 @@
 Каждая получает slug школы. Функции возвращают только опубликованные записи активной школы и только безопасные поля: никаких email и id людей. Тесты — `tests/security/public-site.test.ts` и `tests/integration/public-site.test.ts` (совместимость с TS-схемами сайта).
 
 После этапа 4 в схеме 33 таблицы и 83 политики RLS.
+
+## 7. Обучение: контент, тесты, прогресс (этап 5)
+
+**Кто что видит и меняет**
+
+| Действие | Кто |
+|---|---|
+| Править структуру курса, уроки, тесты | `catalog.manage` в организации или преподаватель группы этого курса (`app.can_edit_course`) |
+| Видеть опубликованные уроки и тесты | ученик активной записи на группу курса и его родитель, преподаватель курса, сотрудник с `learning.read_all` |
+| Видеть ключи ответов (`assessment_answer_keys`) | только редакторы курса. Ученику таблица недоступна целиком |
+| Назначать тест группе, давать пересдачу | преподаватель группы (тест должен быть опубликован и относиться к курсу группы) |
+| Отправлять попытку | только сам ученик, через `submit_assessment_attempt` (прямой INSERT закрыт) |
+| Видеть попытки и разбор | сам ученик, его родитель, преподаватель группы, сотрудник с правом на результаты (`app.can_view_student_results`) |
+
+**Попытки.** `submit_assessment_attempt(assessment, answers, idempotency_key)`:
+
+- проверяет окно назначения и лимит попыток (`max_attempts` + пересдачи);
+- оценивает ответы на сервере по ключам: `gap_fill` даёт частичный балл, текст сравнивается после нормализации;
+- записывает попытку сразу с итоговым баллом, потом ответы. Обе таблицы append-only;
+- повтор с тем же ключом возвращает ту же попытку, а не создаёт новую. Номер попытки уникален, параллельные отправки сериализуются advisory-блокировкой.
+
+**Показ ответов** (`attempt_review`) зависит от `reveal_answers` теста:
+
+- `never` — ключи и пояснения ученику не показываются;
+- `after_submit` — сразу после попытки;
+- `after_due` — после срока назначения группы.
+
+Редакторы курса видят ключи всегда. Вопросы и ключи с уже данными ответами менять нельзя (`app.guard_answered_question`), чтобы старые результаты оставались верными.
+
+**Прогресс.** `course_progress` считается из сохранённых строк `lesson_progress` и `assessment_attempts`, отдельного счётчика нет. Завершённый урок повторным открытием не «откатывается».
+
+Тесты — `tests/security/lms.test.ts` (26), включая полный сценарий «запись → урок → тест → разбор → прогресс».

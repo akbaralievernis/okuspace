@@ -33,3 +33,6 @@ export function zonedLocalToUtc(local: string, timeZone: string): Date | null {
     return null;
   }
 }
+
+/** Пояс по умолчанию, если у филиала он не указан (все текущие филиалы — в Кыргызстане). */
+export const DEFAULT_TIMEZONE = 'Asia/Bishkek';
