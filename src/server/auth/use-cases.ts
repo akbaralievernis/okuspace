@@ -64,7 +64,9 @@ export type SuccessCode =
   | 'code_opened'
   | 'checked_in'
   | 'practice_checked'
-  | 'imported';
+  | 'imported'
+  | 'device_created'
+  | 'checked';
 
 export type FormState =
   | { status: 'idle' }

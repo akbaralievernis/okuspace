@@ -46,7 +46,11 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
               {typeof n.payload.note === 'string' && n.payload.note ? <p className="text-sm">{fmt(s.notifNote, { note: n.payload.note })}</p> : null}
               <p className="flex flex-wrap gap-3 text-sm text-muted">
                 <span>{formatShortDateTime(locale, n.createdAt, tzOf(n))}</span>
-                {typeof n.payload.sessionId === 'string' ? (
+                {n.kind === 'monitoring_alert' ? (
+                  <Link className="link" href={`/${locale}/app/monitoring`}>
+                    {s.open}
+                  </Link>
+                ) : typeof n.payload.sessionId === 'string' ? (
                   <Link className="link" href={`/${locale}/app/schedule/sessions/${n.payload.sessionId}`}>
                     {s.open}
                   </Link>
@@ -65,6 +69,7 @@ const tzOf = (n: Notification) => (typeof n.payload.timezone === 'string' ? n.pa
 /** Текст уведомления строится из данных события на языке читателя, а не хранится готовой строкой. */
 function describe(n: Notification, locale: Locale, t: Dictionary): string {
   const s = t.schedule;
+  if (n.kind === 'monitoring_alert') return s.notif.monitoring_alert;
   const p = n.payload;
   const tz = tzOf(n);
   const when = (v: unknown) => (typeof v === 'string' ? formatShortDateTime(locale, v, tz) : '—');

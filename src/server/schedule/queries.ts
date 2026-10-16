@@ -46,7 +46,7 @@ export async function scheduleWindow(from: Date, to: Date): Promise<SessionItem[
 
 export interface Notification {
   id: string;
-  kind: 'session_rescheduled' | 'session_cancelled' | 'session_changed';
+  kind: 'session_rescheduled' | 'session_cancelled' | 'session_changed' | 'monitoring_alert';
   payload: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;

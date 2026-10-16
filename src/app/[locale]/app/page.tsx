@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppHeader, appNav } from '@/components/app-header';
 import { isLocale } from '@/i18n/config';
@@ -5,6 +6,7 @@ import { getDictionary } from '@/i18n/get-dictionary';
 import { fmt } from '@/lib/format';
 import { requireAccess } from '@/server/auth/session';
 import { visibleMemberships } from '@/server/queries/workspace';
+import { createUserClient } from '@/server/supabase/server';
 
 export default async function WorkspacePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -12,6 +14,8 @@ export default async function WorkspacePage({ params }: { params: Promise<{ loca
   const ctx = await requireAccess(locale, `/${locale}/app`);
   const t = getDictionary(locale);
   const mine = await visibleMemberships({ profileId: ctx.user.id });
+  // Уведомление о мониторинге аудиторий — всем участникам школы, где он включён.
+  const { data: monitored } = await (await createUserClient()).from('monitoring_policies').select('organization_id').eq('enabled', true).not('notice_published_at', 'is', null);
 
   return (
     <>
@@ -19,6 +23,13 @@ export default async function WorkspacePage({ params }: { params: Promise<{ loca
       <main id="main" className="mx-auto max-w-5xl px-4 py-8">
         <h1 className="text-2xl font-bold">{t.app.title}</h1>
         <p className="mt-1 text-muted">{fmt(t.app.greeting, { email: ctx.user.email ?? '' })}</p>
+        {(monitored ?? []).length ? (
+          <p className="mt-4 rounded-[var(--radius-control)] border-l-4 border-brand-700 bg-surface-muted px-4 py-3 text-sm">
+            <Link className="link" href={`/${locale}/app/monitoring/notice`}>
+              {t.monitoring.noticeOpen}
+            </Link>
+          </p>
+        ) : null}
 
         <h2 className="mt-8 text-lg font-semibold">{t.app.membershipsTitle}</h2>
         {mine.filter((m) => m.status === 'active').length === 0 ? (

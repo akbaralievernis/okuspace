@@ -182,7 +182,7 @@ describe('read policies not covered by scenario tests', () => {
   const n = (actor: string, sql: string, params: unknown[] = []) => as(db, actor, (tx) => count(tx, sql, params));
 
   it('RBAC: permissions and role grants are readable', async () => {
-    expect(await n(U.studentA1, 'select 1 from public.permissions')).toBe(21);
+    expect(await n(U.studentA1, 'select 1 from public.permissions')).toBe(23);
     expect(await n(U.studentA1, 'select 1 from public.role_grants')).toBeGreaterThan(10);
   });
 

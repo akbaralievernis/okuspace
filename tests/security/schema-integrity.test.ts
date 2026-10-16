@@ -38,7 +38,8 @@ describe('schema invariants (docs/architecture/DATA_MODEL.md §6)', () => {
     // Намеренно без политик — доступ только через функции:
     // rate_limits — hit_rate_limit(); attendance_codes — open_attendance_code() / check_in_with_code() (хранится лишь хеш);
     // payment_webhook_events — record_provider_payment() после проверки подписи.
-    const serviceRoleOnly = ['attendance_codes', 'payment_webhook_events', 'rate_limits'];
+    // occupancy_snapshots / zone_crossings — читаются только функциями мониторинга с записью в журнал.
+    const serviceRoleOnly = ['attendance_codes', 'occupancy_snapshots', 'payment_webhook_events', 'rate_limits', 'zone_crossings'];
     const missing = await rows<{ relname: string }>(
       db,
       `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace

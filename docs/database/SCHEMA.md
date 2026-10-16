@@ -1,4 +1,4 @@
-# Схема базы данных (этапы 2–9)
+# Схема базы данных (этапы 2–10)
 
 Источник истины — миграции в [`supabase/migrations`](../../supabase/migrations). Этот документ их описывает, но не заменяет. Концептуальная модель — в [DATA_MODEL.md](../architecture/DATA_MODEL.md).
 
@@ -16,6 +16,7 @@
 | `20261019100000_ai_lab` (этап 7) | право `ai.manage` (директор, MFA); `ai_settings` (AI выключен по умолчанию, бюджет, дневной лимит, голос — выключен); `ai_calls` (журнал вызовов: резерв → итог, закрывает только сервер); `ai_begin` (лимиты и бюджет под блокировкой школы), `ai_finish` (service role); `ai_conversations`, `ai_messages` (реплики ассистента — только сервер); `ai_feedback` (только сервер), `ai_feedback_disputes` (оспорить может ученик или преподаватель, решает преподаватель), `ai_practice_results` + `record_practice` (проверка в БД), `ai_lab_stats`, `ai_can_resolve` |
 | `20261020100000_crm` (этап 8) | право `crm.admin` (директор, менеджер филиала; MFA); `crm_contacts` (нормализованный телефон, уникальность телефона/email в школе), `crm_events` (история, append-only, только обезличивание), `crm_reminders`, `crm_trial_bookings` (общие места со слотами сайта), `crm_exports` (журнал выгрузок); `lead_requests.contact_id`; `submit_lead_request` и `public_trial_slots` пересозданы: заявка сразу попадает в CRM; функции `crm_book_trial`, `crm_trial_result`, `crm_convert`, `crm_enroll`, `crm_import`, `crm_export`, `crm_erase`, `crm_purge_stale` (service role), `crm_funnel` |
 | `20261021100000_finance_module` (этап 9) | право `finance.approve` (директор, менеджер филиала; MFA); `finance_periods`; `price_lists`, `tariffs` (цена неизменна); `invoice_lines` (сумма черновика считается в БД); `invoice_adjustments` (скидка/кредит/дебет, утверждение другим человеком); `invoice_status_history`; распределения получили «освобождение» (`kind = release`); платежи — источник `staff`/`provider`; `expenses` (сторно); `payment_webhook_events` + `record_provider_payment` (только service role); представление `invoice_balances` пересоздано (+ `due`); `finance_report`, `finance_debts` |
+| `20261022100000_monitoring` (этап 10) | права `monitoring.view` (директор, менеджер филиала, администратор) и `monitoring.manage` (директор, менеджер филиала; MFA); `monitoring_policies` (выключено без цели, основания, уведомления и юридической проверки); `camera_devices` (только хеш токена); `occupancy_snapshots`, `zone_crossings` (только числа, без политик — чтение через функции); `monitoring_alerts` (очередь проверки), `monitoring_access_log`; `ingest_monitoring` и `monitoring_purge` (service role), `monitoring_check`, `monitoring_room_timeline`, `room_utilization`; вид уведомления `monitoring_alert` |
 
 ## 1. Таблицы
 
@@ -81,6 +82,12 @@
 - `finance_periods`
 - `payment_webhook_events` (append-only, без политик: только service role)
 
+**Мониторинг аудиторий (этап 10)**
+
+- `monitoring_policies`, `camera_devices`
+- `occupancy_snapshots`, `zone_crossings` (только числа; удаляет только процедура хранения)
+- `monitoring_alerts`, `monitoring_access_log` (append-only)
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -96,7 +103,6 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `camera_devices`, `occupancy_snapshots`, `attendance_reviews`, `monitoring_policies` | 10 | После юридической проверки |
 | `notifications`, `files`, `integrations` | 11 / 5 | Вместе с очередью уведомлений и загрузкой файлов |
 
 ## 2. Инварианты, закреплённые в БД
@@ -157,7 +163,7 @@
 
 ## 5. Как проверяется
 
-- `tests/security/*.test.ts`: 293 теста на PGlite (этап 9) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
+- `tests/security/*.test.ts`: 306 тестов на PGlite (этап 10) (PostgreSQL 18.3). Перед запуском применяются `tests/db/supabase-shim.sql` и все миграции.
 - Решение и ограничения этого подхода — [ADR-0004](../DECISIONS.md).
 - Запуск: `npm run test`.
 
@@ -280,4 +286,27 @@
 **Права.** Бухгалтер: счета, строки, запросы корректировок, платежи, возвраты, освобождения, расходы. Директор и менеджер филиала: утверждения, прайс-листы, периоды, чтение. Директор не проводит деньги сам; бухгалтер не утверждает.
 
 Тесты — `tests/security/finance-module.test.ts` (16) и `finance.test.ts` (этап 2).
+
+## 12. Мониторинг аудиторий (этап 10)
+
+**Четыре уровня достоверности** — разные таблицы и разные правила:
+
+| Уровень | Где | Кто создаёт | Определяет личность |
+|---|---|---|---|
+| 1. Подсчёт людей в аудитории | `occupancy_snapshots.people_count` | устройство (через сервер) | нет |
+| 2. Пересечение входной зоны | `zone_crossings.direction` | устройство (через сервер) | нет |
+| 3. Идентификация ученика | `attendance_events` (код, карта; камера — только с подтверждением человеком, этап 6) | ученик, устройство доступа, преподаватель | да, без лица |
+| 4. Подтверждённая посещаемость | `attendance_records` | преподаватель или администратор | да |
+
+Данные уровней 1–2 посещаемость **не меняют**: расхождения становятся предупреждениями (`monitoring_alerts`) в очереди проверки человеком; ошибочная отметка исправляется в журнале занятия с причиной и историей (этап 6). Изображений, видео и биометрии в схеме нет — для них нет ни столбцов, ни API.
+
+**Включение.** `monitoring_policies.enabled` невозможно без цели, правового основания, текста и даты публикации уведомления, даты и автора юридической проверки (CHECK). Пока выключено, `ingest_monitoring` ничего не сохраняет. Уведомление видят все участники школы.
+
+**Устройства.** У каждого — свой случайный токен; в БД только SHA-256, пользователям хеш недоступен (привилегии на столбцы), в аудит не пишется. Неизвестное устройство и неверный токен неразличимы.
+
+**Доступ.** Сырые числа читаются только функциями `monitoring_room_timeline` и `room_utilization`, каждая записывает просмотр в `monitoring_access_log` (append-only). Филиал видит только своё (`monitoring.view` в охвате). Журнал доступа — `monitoring.manage`.
+
+**Хранение.** Числа — не дольше `data_retention_days` (до 90), разобранные предупреждения — `alert_retention_days` (30–365). Удаляет только `monitoring_purge` (service role, по расписанию — этап 13); любое другое удаление отклоняется триггером.
+
+Тесты — `tests/security/monitoring.test.ts` (13).
 
