@@ -36,12 +36,12 @@ describe('TypeScript RBAC mirror matches the database', () => {
   it('MFA-gated permissions are enforced by the database (aal2 in policies)', async () => {
     const policies = await rows<{ tablename: string; qual: string | null; with_check: string | null }>(
       db,
-      `select tablename, qual, with_check from pg_policies where schemaname = 'public' and tablename in ('memberships', 'invitations', 'payments', 'invoices', 'payment_allocations')`,
+      `select tablename, qual, with_check from pg_policies where schemaname = 'public' and tablename in ('memberships', 'invitations', 'payments', 'invoices', 'payment_allocations', 'grading_policies')`,
     );
     for (const p of policies.filter((x) => (x.with_check ?? '').length > 0)) {
       expect(`${p.tablename}: ${p.with_check}`).toMatch(/aal2|can_assign_role/);
     }
-    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage', 'task.manage', 'announcement.publish']);
+    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage', 'task.manage', 'announcement.publish', 'grading.manage']);
     // Блок A: задачи и объявления меняются только функциями — каждая требует aal2.
     const fns = await rows<{ proname: string; src: string }>(
       db,

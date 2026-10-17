@@ -46,7 +46,9 @@ export type FieldErrorCode =
   | 'marks_required'
   | 'amount_invalid'
   | 'assignees_required'
-  | 'audience_required';
+  | 'audience_required'
+  | 'weights_invalid'
+  | 'month_invalid';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 128;

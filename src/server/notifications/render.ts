@@ -44,7 +44,19 @@ export function renderNotification(kind: string, payload: Record<string, unknown
     kinds: Array.isArray(p.kinds) ? p.kinds.map((c) => d.schedule.changeKinds[c as keyof typeof d.schedule.changeKinds] ?? String(c)).join(', ') : '',
     title: str(p.title),
     due: p.dueAt ? when(locale, p.dueAt, tz) : n.noDue,
-    result: p.status === 'returned' ? n.returned : fmt(n.graded, { score: str(p.score), max: str(p.maxScore) }),
+    result:
+      k === 'exam_result' && p.absent === true
+        ? n.examAbsent
+        : p.status === 'returned'
+          ? n.returned
+          : fmt(n.graded, { score: p.score === null || p.score === undefined ? '—' : String(p.score), max: str(p.maxScore === undefined ? undefined : String(p.maxScore)) }),
+    month: str(p.month),
+    final:
+      typeof p.grade === 'number'
+        ? `${p.grade} (${String(p.final)}%)`
+        : p.final !== null && p.final !== undefined
+          ? `${String(p.final)}%`
+          : '—',
     score: str(p.score),
     max: str(p.maxScore),
     number: str(p.number),
@@ -95,6 +107,11 @@ function pathFor(kind: NotificationKind, p: Record<string, unknown>): string {
     case 'task_comment':
     case 'task_overdue':
       return id(p.taskId) ? `/app/tasks/${id(p.taskId)}` : '/app/tasks';
+    case 'exam_result':
+    case 'report_card':
+      return '/app/learn/reports';
+    case 'report_cards_ready':
+      return id(p.groupId) ? `/app/groups/${id(p.groupId)}/grades${typeof p.month === 'string' && /^\d{4}-\d{2}$/.test(p.month) ? `?month=${p.month}` : ''}` : '/app/groups';
     case 'announcement':
     case 'announcement_ack':
       return id(p.announcementId) ? `/app/announcements/${id(p.announcementId)}` : '/app/announcements';

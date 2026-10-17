@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SelectField, TextareaField } from '@/components/ui/controls';
 import { Field } from '@/components/ui/field';
@@ -69,6 +70,14 @@ export default async function GroupPage({ params }: { params: Promise<{ locale: 
 
   return (
     <WorkspacePage ctx={ctx} locale={locale} t={t} title={group.name as string}>
+      <p className="flex flex-wrap gap-4">
+        <Link className="link" href={`/${locale}/app/groups/${id}/grades`}>
+          {t.grades.gradesLink}
+        </Link>
+        <Link className="link" href={`/${locale}/app/groups/${id}/exams`}>
+          {t.grades.examsLink}
+        </Link>
+      </p>
       {canManage ? (
         <ActionForm action={setGroupStatusAction} submitLabel={t.lms.common.save} pendingLabel={t.common.pending} messages={msg} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="locale" value={locale} />
@@ -296,6 +305,18 @@ export default async function GroupPage({ params }: { params: Promise<{ locale: 
               <TextareaField name="instructions" label={g.instructions} idPrefix="hw" />
               <Field name="dueAt" type="datetime-local" label={`${g.dueAt} (${tz})`} idPrefix="hw" />
               <Field name="maxScore" inputMode="decimal" label={g.maxScore} defaultValue="10" idPrefix="hw" />
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">{g.forStudents}</legend>
+                <p className="text-sm text-muted">{g.forStudentsHint}</p>
+                {(enrollments.data ?? [])
+                  .filter((e) => e.status === 'active')
+                  .map((e) => (
+                    <label key={e.student_id as string} className="flex items-start gap-3 text-sm">
+                      <input type="checkbox" name="student" value={e.student_id as string} className="mt-0.5 size-5 shrink-0 accent-brand-700" />
+                      <span>{nameOf(e.student_id as string)}</span>
+                    </label>
+                  ))}
+              </fieldset>
             </ActionForm>
           </details>
         ) : null}

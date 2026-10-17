@@ -27,6 +27,9 @@ const payloads: Record<string, Record<string, unknown>> = {
   task_overdue: { taskId: SESSION, title: 'Отчёт', dueAt: '2026-10-20T12:00:00Z', actorName: 'Нурия' },
   announcement: { announcementId: SESSION, title: 'Собрание', actorName: 'Айгуль' },
   announcement_ack: { announcementId: SESSION, title: 'Новые правила', actorName: 'Айгуль' },
+  exam_result: { examId: SESSION, title: 'Speaking', score: 40, maxScore: 50, absent: false },
+  report_card: { reportId: SESSION, month: '2026-09', final: 73, grade: 3 },
+  report_cards_ready: { groupId: SESSION, groupName: 'A1', month: '2026-09' },
   weekly_report: { week: '2026-42', newContacts: 3, newEnrollments: 2, received: '12000.00', attendanceMarked: 10, attendancePresent: 9, failedDeliveries: 0 },
 };
 
@@ -56,6 +59,12 @@ describe('renderNotification', () => {
     expect(renderNotification('task_returned', payloads.task_returned!, 'en').text).toContain('Добавьте цифры');
     expect(renderNotification('announcement_ack', payloads.announcement_ack!, 'ky').path).toBe(`/app/announcements/${SESSION}`);
     expect(renderNotification('task_overdue', { taskId: 'javascript:alert(1)' }, 'ru').path).toBe('/app/tasks');
+    expect(renderNotification('exam_result', payloads.exam_result!, 'ru').text).toContain('40 из 50');
+    expect(renderNotification('exam_result', { title: 'Speaking', score: null, maxScore: 50, absent: true }, 'ru').text).toContain(getDictionary('ru').notify.examAbsent);
+    expect(renderNotification('report_card', payloads.report_card!, 'en').text).toContain('3 (73%)');
+    expect(renderNotification('report_card', { month: '2026-09', final: 81.5, grade: null }, 'en').text).toContain('81.5%');
+    expect(renderNotification('report_cards_ready', payloads.report_cards_ready!, 'ru').path).toBe(`/app/groups/${SESSION}/grades?month=2026-09`);
+    expect(renderNotification('report_cards_ready', { groupId: SESSION, month: '2026-09&x=1' }, 'ru').path).toBe(`/app/groups/${SESSION}/grades`);
     const returned = renderNotification('homework_graded', { ...payloads.homework_graded, status: 'returned' }, 'ru').text;
     expect(returned).toContain(getDictionary('ru').notify.returned);
   });

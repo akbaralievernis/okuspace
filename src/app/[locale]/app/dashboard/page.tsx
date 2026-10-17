@@ -118,6 +118,13 @@ export default async function DashboardPage({ params, searchParams }: { params: 
           {d.show}
         </button>
       </form>
+      {org && can(m, 'grading.manage', org, null) ? (
+        <p>
+          <Link className="link" href={`/${locale}/app/grading`}>
+            {t.grades.policyLink}
+          </Link>
+        </p>
+      ) : null}
       <p className="flex flex-wrap gap-4 text-sm">
         {(['p7', 'p30', 'pMonth'] as const).map((p) => (
           <Link key={p} className="link" href={q(presetPeriod(p, tz))}>

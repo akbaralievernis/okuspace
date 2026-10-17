@@ -23,7 +23,6 @@ describe('demo seed', () => {
     expect(await n('memberships')).toBe(DEMO_USERS.length);
     expect(await n('lesson_sessions')).toBeGreaterThanOrEqual(18);
     expect(await n('attendance_records')).toBeGreaterThan(0);
-    expect(await n('assignments')).toBe(2);
     expect(await n('assessment_questions')).toBe(3);
     expect(await n('invoices')).toBe(3);
     expect(await n('crm_contacts')).toBe(4);
@@ -31,9 +30,12 @@ describe('demo seed', () => {
     expect(await n('trial_slots')).toBe(3);
     expect(await n('staff_tasks')).toBe(4);
     expect(await n('announcements')).toBe(2);
+    expect(await n('group_exams')).toBe(1);
+    expect(await n('report_cards')).toBe(2);
+    expect(await n('assignments')).toBe(3);
     // Триггеры событий уже создали уведомления: задания, проверка, пропуски, серия пропусков.
     const kinds = (await rows<{ kind: string }>(db, 'select distinct kind from public.notifications where organization_id = $1', [ORG])).map((r) => r.kind);
-    expect(kinds).toEqual(expect.arrayContaining(['homework_assigned', 'submission_received', 'homework_graded', 'absence_alert', 'manager_alert', 'task_assigned', 'announcement_ack', 'announcement']));
+    expect(kinds).toEqual(expect.arrayContaining(['homework_assigned', 'submission_received', 'homework_graded', 'absence_alert', 'manager_alert', 'task_assigned', 'announcement_ack', 'announcement', 'exam_result']));
   });
 
   it('is not loaded twice', async () => {

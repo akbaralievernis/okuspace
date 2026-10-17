@@ -19,6 +19,7 @@
 | `20261022100000_monitoring` (этап 10) | права `monitoring.view` (директор, менеджер филиала, администратор) и `monitoring.manage` (директор, менеджер филиала; MFA); `monitoring_policies` (выключено без цели, основания, уведомления и юридической проверки); `camera_devices` (только хеш токена); `occupancy_snapshots`, `zone_crossings` (только числа, без политик — чтение через функции); `monitoring_alerts` (очередь проверки), `monitoring_access_log`; `ingest_monitoring` и `monitoring_purge` (service role), `monitoring_check`, `monitoring_room_timeline`, `room_utilization`; вид уведомления `monitoring_alert` |
 | `20261023100000_notifications` (этап 11) | справочник `notification_kinds` (14 видов: обязательные/необязательные, важные); `notifications.kind` — внешний ключ на справочник; `notification_preferences` (важное в кабинете не выключается), `notification_channels` (привязанный Telegram), `telegram_link_codes` (только хеш, без политик); очередь `notification_deliveries` (статус, попытки, следующая попытка, ошибка); триггеры событий (домашние задания, работы, результаты тестов, пропуски, серия пропусков); `notify`, `wants`, `enqueue_deliveries`; `generate_scheduled_notifications`, `claim_deliveries`, `complete_delivery`, `link_telegram` (service role), `create_telegram_link_code` |
 | `20261024100000_management` (блок A) | права `task.manage` (директор, менеджер филиала; MFA), `announcement.publish` (директор, менеджер, администратор; MFA), `dashboard.read` (директор, менеджер, администратор); `staff_tasks` + `staff_task_events` (append-only); `announcements` (неизменны после публикации) + `announcement_recipients`; функции `task_create`, `task_transition`, `task_comment`, `generate_task_reminders` (service role), `announcement_publish`, `announcement_read`, `announcement_archive`, `announcement_stats`, `branch_dashboard`; 9 видов уведомлений |
+| `20261025100000_grading` (блок B) | право `grading.manage` (директор, MFA); `assignment_students` (задание отдельным ученикам) + `assignment_create`; политика чтения заданий пересоздана (адресаты); `group_exams`, `exam_results` (аудит исправлений); `group_assessments.counts_as_exam`; `grading_policies`; `report_cards` (неизменны после публикации); `report_cards_generate`, `report_card_comment`, `report_cards_publish`, `generate_monthly_reports` (service role); 3 вида уведомлений |
 
 ## 1. Таблицы
 
@@ -102,6 +103,13 @@
 - `staff_tasks`, `staff_task_events` (append-only)
 - `announcements` (после публикации меняется только архивирование), `announcement_recipients`
 - все четыре только читаются пользователями; изменения — функциями
+
+**Оценивание (блок B)**
+
+- `assignment_students` (адресаты задания; пишет только `assignment_create`)
+- `group_exams`, `exam_results`
+- `grading_policies`
+- `report_cards` (пишут только функции; опубликованный неизменен)
 
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
@@ -390,4 +398,28 @@
 Тесты сверяют каждый показатель с прямым запросом к данным, а финансы — с `finance_report`.
 
 Тесты — `tests/security/management.test.ts` (17), unit — `tests/unit/management/period.test.ts` (4).
+
+## 15. Оценивание и итоги месяца (блок B)
+
+**Задания отдельным ученикам.** Если у задания есть строки в `assignment_students`, его видят, сдают и получают о нём уведомление только эти ученики и их родители; иначе — вся группа. `assignment_create` создаёт черновик, записывает адресатов (только активные ученики группы) и публикует — уведомления уходят уже с учётом адресатов. Сдать неадресованное задание нельзя (триггер).
+
+**Экзамены.** `group_exams` — экзамен в классе (дата, максимум). Баллы вносит преподаватель группы: не больше максимума, только ученикам группы, «не пришёл» — без балла. Ученик и родитель видят свой результат только после публикации. Опубликованный экзамен нельзя снять с публикации, удалить или изменить максимум; исправление балла пишется в аудит (экзамен, ученик, было → стало). Онлайн-тест группы можно засчитать как экзамен (`counts_as_exam`).
+
+**Правила (`grading_policies`).** Веса четырёх частей (целые, сумма 100) и шкала (`five` / `percent`). Без строки — 20/30/20/30, пятибалльная. Меняет директор с MFA.
+
+**Расчёт (`app.compute_report`)** — по ученику, группе и месяцу (границы — по часовому поясу школы):
+
+| Часть | Определение |
+|---|---|
+| посещаемость | (`present` + `late` + `left_early`) / все отметки, кроме `excused`, по занятиям группы, начавшимся в месяце |
+| домашние | задания группы (адресованные ученику) со сроком — или датой выдачи, если срока нет — в месяце: проверено → балл/максимум; не сдано после срока → 0; сдано, не проверено → не учитывается |
+| тесты | тесты группы (не «экзамен») со сроком — или датой открытия — в месяце: лучшая попытка; без попытки после срока → 0; до срока → не учитывается |
+| экзамены | опубликованные экзамены месяца (не пришёл → 0, балл не внесён → не учитывается) и тесты «как экзамен» по правилу тестов |
+| итог | Σ(вес × часть) / Σ(весов частей, где есть данные); пятибалльная: ≥ 90 → 5, ≥ 75 → 4, ≥ 60 → 3, иначе 2 |
+
+**Табель (`report_cards`).** `report_cards_generate(group, month)` (преподаватель группы или `group.manage`) пересчитывает черновики всех учеников и сохраняет комментарий; опубликованные не трогает. В снимке — части, итог, оценка, использованные веса и счётчики. `report_cards_publish` публикует черновики: ученик и родители получают уведомление. Опубликованный табель неизменен (триггер, в том числе для service role). `generate_monthly_reports` (планировщик) 1–3 числа создаёт черновики за прошлый месяц для групп, у которых в том месяце были занятия, и уведомляет преподавателей.
+
+**Видимость.** Табели и результаты видят преподаватель группы и `learning.read_all` в филиале; ученик и родитель — только опубликованное и только своё.
+
+Тесты — `tests/security/grading.test.ts` (11): каждая часть сверена с посчитанными вручную значениями, unit — `tests/unit/management/month.test.ts` (3).
 

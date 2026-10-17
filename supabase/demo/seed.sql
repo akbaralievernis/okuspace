@@ -92,9 +92,9 @@ insert into public.classrooms (id, organization_id, branch_id, name, capacity) v
   ('de300000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', '102', 10),
   ('de300000-0000-4000-8000-000000000003', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000002', '201', 12);
 
-insert into public.groups (id, organization_id, branch_id, course_id, name, capacity, starts_on) values
-  ('de310000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'de220000-0000-4000-8000-000000000001', 'EN-A2 вечер', 12, current_date - 30),
-  ('de310000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000002', 'de220000-0000-4000-8000-000000000002', 'EN-B1 Ош', 10, current_date - 30);
+insert into public.groups (id, organization_id, branch_id, course_id, name, capacity, starts_on, status) values
+  ('de310000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'de220000-0000-4000-8000-000000000001', 'EN-A2 вечер', 12, current_date - 30, 'active'),
+  ('de310000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000002', 'de220000-0000-4000-8000-000000000002', 'EN-B1 Ош', 10, current_date - 30, 'active');
 
 insert into public.group_teachers (organization_id, branch_id, group_id, teacher_id) values
   ('de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'de310000-0000-4000-8000-000000000001', pg_temp.u('teacher@example.com')),
@@ -313,6 +313,19 @@ select public.announcement_publish('de000000-0000-4000-8000-000000000001', null,
 select pg_temp.act_as('admin@example.com');
 select public.task_transition(t.id, 'start')
 from public.staff_tasks t where t.assignee_id = pg_temp.u('admin@example.com') and t.status = 'open';
+
+-- Кабинет учителя (блок B): экзамен с результатами и задание одному ученику.
+select pg_temp.act_as('teacher@example.com');
+insert into public.group_exams (id, organization_id, branch_id, group_id, title, held_on, max_score, created_by)
+values ('de450000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001',
+        'de310000-0000-4000-8000-000000000001', 'Speaking exam: Unit 1', current_date - 3, 50, pg_temp.u('teacher@example.com'));
+insert into public.exam_results (exam_id, student_id, organization_id, score, absent) values
+  ('de450000-0000-4000-8000-000000000001', pg_temp.u('student@example.com'), 'de000000-0000-4000-8000-000000000001', 44, false),
+  ('de450000-0000-4000-8000-000000000001', pg_temp.u('student2@example.com'), 'de000000-0000-4000-8000-000000000001', 31, false);
+update public.group_exams set status = 'published' where id = 'de450000-0000-4000-8000-000000000001';
+select public.assignment_create('de310000-0000-4000-8000-000000000001', 'Работа над ошибками: Past Simple',
+  'Повторите правило и сделайте 10 предложений.', now() + interval '4 days', 10, array[pg_temp.u('student2@example.com')]);
+select public.report_cards_generate('de310000-0000-4000-8000-000000000001', date_trunc('month', current_date)::date);
 select set_config('request.jwt.claims', '', true);
 
 select 'Демо-данные загружены' as result,

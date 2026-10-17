@@ -290,16 +290,19 @@ export async function grantRetakeAction(_p: FormState, form: FormData) {
 }
 
 export async function createHomeworkAction(_p: FormState, form: FormData) {
-  return runAction(form, ['/app/groups', '/app/learn'], async (userId) => {
+  return runAction(form, ['/app/groups', '/app/learn'], async () => {
     const r = parseForm(HomeworkSchema, form);
     if (!r.ok) return r.state;
     const v = r.data;
     const db = await createUserClient();
     const { data: branch } = await db.from('branches').select('timezone').eq('id', v.branchId).maybeSingle();
     const due = v.dueAt ? zonedLocalToUtc(v.dueAt, (branch?.timezone as string | undefined) ?? 'Asia/Bishkek') : null;
-    const { error } = await db.from('assignments').insert({
-      organization_id: v.organizationId, branch_id: v.branchId, group_id: v.groupId, title: v.title, instructions: v.instructions ?? null,
-      due_at: due?.toISOString() ?? null, max_score: v.maxScore, status: 'published', created_by: userId,
+    // Флажки `student` — задание только выбранным ученикам; без флажков — всей группе.
+    const students = form.getAll('student').map(String);
+    if (!students.every((s) => /^[0-9a-f-]{36}$/i.test(s))) return { status: 'error', code: 'validation' };
+    const { error } = await db.rpc('assignment_create', {
+      p_group: v.groupId, p_title: v.title, p_instructions: v.instructions ?? null, p_due_at: due?.toISOString() ?? null,
+      p_max_score: v.maxScore, p_students: [...new Set(students)],
     });
     return dbState(error);
   }, PERSON);

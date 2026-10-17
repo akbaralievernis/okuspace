@@ -22,6 +22,11 @@ export default async function LearnPage({ params }: { params: Promise<{ locale: 
 
   return (
     <WorkspacePage ctx={ctx} locale={locale} t={t} title={l.title} unavailable={courses === null}>
+      <p>
+        <Link className="link" href={`/${locale}/app/learn/reports`}>
+          {t.grades.myLink}
+        </Link>
+      </p>
       {withProgress.length === 0 ? (
         <EmptyState title={l.empty} />
       ) : (
