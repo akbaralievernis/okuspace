@@ -27,16 +27,20 @@ export default async function CoursePage({ params }: { params: Promise<{ locale:
   const course = catalog.data.find((x) => x.id === id);
   if (!course) notFound();
 
-  const cefr = course.level.framework === 'cefr' ? t.site.levels.cefr[course.level.code as keyof typeof t.site.levels.cefr] : null;
+  const cefr = course.level?.framework === 'cefr' ? t.site.levels.cefr[course.level.code as keyof typeof t.site.levels.cefr] : null;
 
   return (
     <article className="space-y-10">
       <PageHeader title={course.title}>
         <div className="flex flex-wrap gap-2">
-          <Badge tone="brand">{course.language.name}</Badge>
-          <Badge>
-            {course.level.code} · {course.level.title}
-          </Badge>
+          {course.category ? <Badge tone="brand">{t.site.categories[course.category]}</Badge> : null}
+          {course.language ? <Badge tone="brand">{course.language.name}</Badge> : null}
+          {course.level ? (
+            <Badge>
+              {course.level.code} · {course.level.title}
+            </Badge>
+          ) : null}
+          {course.ageNote ? <Badge>{course.ageNote}</Badge> : null}
           <Badge>{t.site.formats[course.format]}</Badge>
           <Badge>{t.site.kinds[course.kind]}</Badge>
         </div>
@@ -51,7 +55,7 @@ export default async function CoursePage({ params }: { params: Promise<{ locale:
           <p className="text-xl">
             <PriceLabel course={course} locale={locale} t={t} />
           </p>
-          <p className="text-muted">{fmt(c.duration, { weeks: course.durationWeeks, lessons: course.lessonsPerWeek })}</p>
+          {course.durationWeeks && course.lessonsPerWeek ? <p className="text-muted">{fmt(c.duration, { weeks: course.durationWeeks, lessons: course.lessonsPerWeek })}</p> : null}
           <p className="text-sm text-muted">{t.site.prices.note}</p>
           <div className="flex flex-col gap-2 pt-2">
             <ButtonLink href={`/${locale}/trial`}>{c.trialCta}</ButtonLink>

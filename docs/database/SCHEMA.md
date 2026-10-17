@@ -20,6 +20,7 @@
 | `20261023100000_notifications` (этап 11) | справочник `notification_kinds` (14 видов: обязательные/необязательные, важные); `notifications.kind` — внешний ключ на справочник; `notification_preferences` (важное в кабинете не выключается), `notification_channels` (привязанный Telegram), `telegram_link_codes` (только хеш, без политик); очередь `notification_deliveries` (статус, попытки, следующая попытка, ошибка); триггеры событий (домашние задания, работы, результаты тестов, пропуски, серия пропусков); `notify`, `wants`, `enqueue_deliveries`; `generate_scheduled_notifications`, `claim_deliveries`, `complete_delivery`, `link_telegram` (service role), `create_telegram_link_code` |
 | `20261024100000_management` (блок A) | права `task.manage` (директор, менеджер филиала; MFA), `announcement.publish` (директор, менеджер, администратор; MFA), `dashboard.read` (директор, менеджер, администратор); `staff_tasks` + `staff_task_events` (append-only); `announcements` (неизменны после публикации) + `announcement_recipients`; функции `task_create`, `task_transition`, `task_comment`, `generate_task_reminders` (service role), `announcement_publish`, `announcement_read`, `announcement_archive`, `announcement_stats`, `branch_dashboard`; 9 видов уведомлений |
 | `20261025100000_grading` (блок B) | право `grading.manage` (директор, MFA); `assignment_students` (задание отдельным ученикам) + `assignment_create`; политика чтения заданий пересоздана (адресаты); `group_exams`, `exam_results` (аудит исправлений); `group_assessments.counts_as_exam`; `grading_policies`; `report_cards` (неизменны после публикации); `report_cards_generate`, `report_card_comment`, `report_cards_publish`, `generate_monthly_reports` (service role); 3 вида уведомлений |
+| `20261026100000_site_brand` (сайт American Dream) | у курсов язык, уровень и длительность необязательны; `category`, `age_note`, `site_code`; у филиалов `whatsapp`, `site_number`; `branch_courses`; `site_settings` (содержимое главной); у заявок — для ребёнка или для себя, ребёнок, несколько филиалов, «откуда узнали»; `submit_site_request` (service role); `public_site` и `public_catalog` пересозданы |
 
 ## 1. Таблицы
 
@@ -110,6 +111,11 @@
 - `group_exams`, `exam_results`
 - `grading_policies`
 - `report_cards` (пишут только функции; опубликованный неизменен)
+
+**Сайт школы**
+
+- `branch_courses` (какие курсы ведёт филиал)
+- `site_settings` (содержимое главной; одна строка на школу)
 
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
@@ -422,4 +428,18 @@
 **Видимость.** Табели и результаты видят преподаватель группы и `learning.read_all` в филиале; ученик и родитель — только опубликованное и только своё.
 
 Тесты — `tests/security/grading.test.ts` (11): каждая часть сверена с посчитанными вручную значениями, unit — `tests/unit/management/month.test.ts` (3).
+
+## 16. Сайт школы под реальный центр (American Dream)
+
+**Курсы не только языковые.** У курса язык, уровень, длительность и число занятий в неделю теперь необязательны: математика, ОРТ, программирование, 1С. Уровень без языка запрещён (CHECK). Раздел сайта — `category`: `english`, `exams`, `languages`, `school`, `it`, `other`. Возраст — `age_note`. `site_code` — код курса во внешних системах (Telegram-бот школы), уникален в школе.
+
+**Филиалы.** `whatsapp` — номер в формате `+996…`. `site_number` — номер филиала в боте школы, уникален в школе. `branch_courses` — какие курсы ведёт филиал: из этого строятся карточки филиалов и выбор в форме. Меняет директор (`site.manage`) с MFA; читают участники школы, публично — через функции.
+
+**Содержимое главной (`site_settings.content`).** Тексты баннера, цифры, преимущества, результаты учеников, клубы, акции, соцсети, логотип — на трёх языках. Приложение проверяет его по разделам (`src/server/public/content.ts`): ошибка в одном разделе не ломает страницу, логотип и фото — только локальные файлы `/brand/…`, Instagram — только `https://www.instagram.com/…`. Меняет директор с MFA.
+
+**Заявка «на курс» (`submit_site_request`, только service role).** Поля: для ребёнка или для себя, имя, имя и возраст ребёнка (обязательны для ребёнка — CHECK), телефон, опубликованный курс своей школы, от 1 до 10 активных филиалов своей школы, «откуда узнали» (`whatsapp`, `instagram`, `ads`, `relatives`, `other`), актуальная версия политики конфиденциальности. Заявка сразу попадает в CRM; всё, что указал человек, записано одной записью истории. Повтор в тот же день (тот же ключ) возвращает ту же заявку с `duplicate: true` — сервер не пересылает её в бот второй раз. Функция возвращает `courseCode` и `branchNumbers` для бота.
+
+**Пересылка в Telegram-бот школы.** Сервер после сохранения отправляет POST JSON в формате бота: `clientName`, `childName` («Имя (8 лет)» или «— (взрослый)»), `phone`, `course`, `source`, `branchIds`. Адрес — `LEAD_FORWARD_URL` (только https), токен — `LEAD_FORWARD_TOKEN`; без адреса пересылки нет. Тайм-аут 5 с; ошибка пишется в журнал и не влияет на ответ человеку — заявка уже в CRM.
+
+Тесты — `tests/security/site-brand.test.ts` (7), unit — `tests/unit/site/*` (25).
 

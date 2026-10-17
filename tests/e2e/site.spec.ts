@@ -88,7 +88,7 @@ test.describe('mobile navigation', () => {
     await button.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Закрыть' })).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('navigation', { name: 'Основное меню' }).getByRole('link', { name: 'Курсы' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Основное меню' }).getByRole('link', { name: 'Курсы', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Меню' })).toBeFocused();
     await expect(page.getByRole('button', { name: 'Меню' })).toHaveAttribute('aria-expanded', 'false');

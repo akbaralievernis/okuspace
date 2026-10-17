@@ -1,10 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+const STATUS = {
+  ky: 'Маалымат убактылуу жеткиликсиз',
+  ru: 'Информация временно недоступна',
+  en: 'This information is temporarily unavailable',
+} as const;
+
 // В e2e база недоступна: заголовок — запасное название, плюс уведомление «временно недоступно».
 const locales = [
-  { code: 'ky', heading: 'Тил мектеби', status: 'Платформа иштелип чыгууда' },
-  { code: 'ru', heading: 'Языковая школа', status: 'Платформа в разработке' },
-  { code: 'en', heading: 'Language school', status: 'Platform under development' },
+  { code: 'ky', heading: 'Тил мектеби', status: STATUS.ky },
+  { code: 'ru', heading: 'Языковая школа', status: STATUS.ru },
+  { code: 'en', heading: 'Language school', status: STATUS.en },
 ] as const;
 
 for (const { code, heading, status } of locales) {

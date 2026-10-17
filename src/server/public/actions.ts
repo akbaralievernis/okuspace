@@ -9,6 +9,7 @@ import type { FormState } from '@/server/auth/use-cases';
 import { getSiteConfig } from '@/server/env';
 import { createPrivilegedClient } from '@/server/supabase/server';
 import { submitLead, type LeadResult, type LeadStore } from './leads';
+import { createForwarder, signupInput, submitSignup, type SignupDeps } from './signup';
 import { getSite } from './site';
 
 function supabaseLeadStore(client: SupabaseClient): LeadStore {
@@ -59,6 +60,57 @@ export async function submitLeadAction(_prev: FormState, form: FormData): Promis
     });
   } catch (error) {
     logger.error('lead submission failed', { error });
+    return { status: 'error', code: 'unavailable' };
+  }
+}
+
+function supabaseSignupStore(client: SupabaseClient): SignupDeps['store'] {
+  return {
+    async submit(i) {
+      const { data, error } = await client.rpc('submit_site_request', {
+        p_org_slug: i.orgSlug,
+        p_for_child: i.forChild === 'child',
+        p_client_name: i.clientName,
+        p_child_name: i.forChild === 'child' ? (i.childName ?? null) : null,
+        p_child_age: i.forChild === 'child' ? (i.childAge ?? null) : null,
+        p_phone: i.phone,
+        p_course: i.courseId,
+        p_branches: i.branchIds,
+        p_heard_from: i.heardFrom,
+        p_locale: i.locale,
+        p_consent_version: i.consentVersion,
+        p_dedupe_key: i.dedupeKey,
+      });
+      if (!error) {
+        const d = (data ?? {}) as { duplicate?: boolean; courseCode?: string; branchNumbers?: number[] };
+        return { result: 'ok', duplicate: Boolean(d.duplicate), courseCode: d.courseCode ?? '', branchNumbers: d.branchNumbers ?? [] };
+      }
+      if (/consent version is not current/.test(error.message)) return { result: 'stale_consent' };
+      if (error.code?.startsWith('22') || error.code?.startsWith('23')) return { result: 'invalid' };
+      logger.error('submit_site_request failed', { code: error.code });
+      return { result: 'unavailable' };
+    },
+  };
+}
+
+/** Заявка «на курс» с главной страницы (CRM + копия в Telegram-бот школы, если настроено). */
+export async function submitSignupAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const raw = form.get('locale');
+  const locale = isLocale(raw) ? raw : defaultLocale;
+  try {
+    const site = await getSite();
+    const privileged = createPrivilegedClient();
+    return await submitSignup(signupInput(form), locale, {
+      store: supabaseSignupStore(privileged),
+      limiter: createSupabaseRateLimiter(privileged),
+      logger,
+      orgSlug: getSiteConfig().SITE_ORGANIZATION_SLUG,
+      privacyVersion: site.ok && site.data ? site.data.legal.privacy : null,
+      ip: await clientIp(),
+      forward: createForwarder(process.env.LEAD_FORWARD_URL, process.env.LEAD_FORWARD_TOKEN),
+    });
+  } catch (error) {
+    logger.error('signup submission failed', { error });
     return { status: 'error', code: 'unavailable' };
   }
 }

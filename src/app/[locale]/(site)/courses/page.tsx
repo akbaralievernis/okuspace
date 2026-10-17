@@ -34,8 +34,8 @@ export default async function CoursesPage({ params, searchParams }: Props) {
 
   const all = catalog.data;
   const shown = filterCatalog(all, filters);
-  const languages = [...new Map(all.map((x) => [x.language.code, x.language.name])).entries()];
-  const levels = [...new Map(all.map((x) => [x.level.code, x.level.order])).entries()].sort((a, b) => a[1] - b[1]).map(([code]) => code);
+  const languages = [...new Map(all.flatMap((x) => (x.language ? [[x.language.code, x.language.name] as const] : []))).entries()];
+  const levels = [...new Map(all.flatMap((x) => (x.level ? [[x.level.code, x.level.order] as const] : []))).entries()].sort((a, b) => a[1] - b[1]).map(([code]) => code);
   const branches = site.ok && site.data ? site.data.branches : [];
   const active = Object.values(filters).some(Boolean);
 

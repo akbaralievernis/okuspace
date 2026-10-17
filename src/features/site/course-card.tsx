@@ -22,8 +22,8 @@ export function CourseCard({ course, locale, t, headingLevel = 'h2' }: { course:
   return (
     <Card className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap gap-2">
-        <Badge tone="brand">{course.language.name}</Badge>
-        <Badge>{course.level.code}</Badge>
+        {course.category ? <Badge tone="brand">{t.site.categories[course.category]}</Badge> : course.language ? <Badge tone="brand">{course.language.name}</Badge> : null}
+        {course.level ? <Badge>{course.level.code}</Badge> : null}
         <Badge>{t.site.formats[course.format]}</Badge>
       </div>
       <Heading className="text-lg font-semibold">
@@ -31,7 +31,11 @@ export function CourseCard({ course, locale, t, headingLevel = 'h2' }: { course:
           {course.title}
         </Link>
       </Heading>
-      <p className="text-sm text-muted">{fmt(t.site.courses.duration, { weeks: course.durationWeeks, lessons: course.lessonsPerWeek })}</p>
+      {course.durationWeeks && course.lessonsPerWeek ? (
+        <p className="text-sm text-muted">{fmt(t.site.courses.duration, { weeks: course.durationWeeks, lessons: course.lessonsPerWeek })}</p>
+      ) : course.ageNote ? (
+        <p className="text-sm text-muted">{course.ageNote}</p>
+      ) : null}
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
         <PriceLabel course={course} locale={locale} t={t} />
         {openSeats > 0 ? <Badge tone="success">{fmt(t.site.courses.seats, { count: openSeats })}</Badge> : null}

@@ -5,8 +5,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { locales, switchLocaleInPath, type Locale } from '@/i18n/config';
 import { localeNames } from '@/i18n/get-dictionary';
 
-/** Переключает язык, сохраняя текущий путь и параметры запроса. */
-export function LanguageSwitcher({ current, label }: { current: Locale; label: string }) {
+const CODES: Record<Locale, string> = { ky: 'KG', ru: 'RU', en: 'EN' };
+
+/**
+ * Переключает язык, сохраняя текущий путь и параметры запроса.
+ * compact — короткие коды RU / KG / EN (шапка сайта); доступное имя содержит и название языка, и код.
+ */
+export function LanguageSwitcher({ current, label, compact = false }: { current: Locale; label: string; compact?: boolean }) {
   const pathname = usePathname();
   const search = useSearchParams().toString();
 
@@ -23,11 +28,12 @@ export function LanguageSwitcher({ current, label }: { current: Locale; label: s
                 hrefLang={locale}
                 lang={locale}
                 aria-current={active ? 'true' : undefined}
-                className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm ${
+                aria-label={compact ? `${localeNames[locale]} (${CODES[locale]})` : undefined}
+                className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-sm ${compact ? 'px-2 font-bold' : 'px-3'} ${
                   active ? 'bg-brand-700 text-white' : 'text-ink hover:bg-surface-muted'
                 }`}
               >
-                {localeNames[locale]}
+                {compact ? CODES[locale] : localeNames[locale]}
               </Link>
             </li>
           );

@@ -48,9 +48,9 @@ where p.id = pg_temp.u(v.email);
 insert into public.organizations (id, name, slug) values
   ('de000000-0000-4000-8000-000000000001', 'Okuspace Demo School', 'demo');
 
-insert into public.branches (id, organization_id, name, city, address, phone, email) values
-  ('de100000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'Центр', 'Бишкек', 'ул. Примерная, 1', '+996 312 000 001', 'center@example.com'),
-  ('de100000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'Ош', 'Ош', 'ул. Демонстрационная, 2', '+996 3222 00 002', 'osh@example.com');
+insert into public.branches (id, organization_id, name, city, address, phone, email, site_number) values
+  ('de100000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'Центр', 'Бишкек', 'ул. Примерная, 1', '+996 312 000 001', 'center@example.com', 1),
+  ('de100000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'Ош', 'Ош', 'ул. Демонстрационная, 2', '+996 3222 00 002', 'osh@example.com', 2);
 
 insert into public.memberships (organization_id, branch_id, profile_id, role)
 select 'de000000-0000-4000-8000-000000000001', v.branch::uuid, pg_temp.u(v.email), v.role
@@ -81,11 +81,11 @@ insert into public.course_levels (id, organization_id, language_id, code, title,
   ('de210000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de200000-0000-4000-8000-000000000001', 'A2', 'Elementary', 2),
   ('de210000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'de200000-0000-4000-8000-000000000001', 'B1', 'Intermediate', 3);
 
-insert into public.courses (id, organization_id, language_id, level_id, title, description, format, kind, duration_weeks, lessons_per_week, status, public_price, public_price_currency, public_price_unit) values
+insert into public.courses (id, organization_id, language_id, level_id, title, description, format, kind, duration_weeks, lessons_per_week, status, public_price, public_price_currency, public_price_unit, category, site_code) values
   ('de220000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de200000-0000-4000-8000-000000000001', 'de210000-0000-4000-8000-000000000001',
-   'General English A2', 'Разговорный английский для начинающих: повседневные темы, грамматика, словарь.', 'offline', 'group', 16, 3, 'published', 6000, 'KGS', 'month'),
+   'General English A2', 'Разговорный английский для начинающих: повседневные темы, грамматика, словарь.', 'offline', 'group', 16, 3, 'published', 6000, 'KGS', 'month', 'english', 'English (General)'),
   ('de220000-0000-4000-8000-000000000002', 'de000000-0000-4000-8000-000000000001', 'de200000-0000-4000-8000-000000000001', 'de210000-0000-4000-8000-000000000002',
-   'English B1 Online', 'Онлайн-курс среднего уровня: обсуждения, письмо, подготовка к экзаменам.', 'online', 'group', 20, 2, 'published', 5000, 'KGS', 'month');
+   'English B1 Online', 'Онлайн-курс среднего уровня: обсуждения, письмо, подготовка к экзаменам.', 'online', 'group', 20, 2, 'published', 5000, 'KGS', 'month', 'exams', 'IELTS');
 
 insert into public.classrooms (id, organization_id, branch_id, name, capacity) values
   ('de300000-0000-4000-8000-000000000001', 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', '101', 12),

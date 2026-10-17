@@ -13,7 +13,7 @@ import { createUserClient } from '@/server/supabase/server';
 
 type Course = {
   id: string; language_id: string; level_id: string; title: string; description: string | null; format: string; kind: string;
-  duration_weeks: number; lessons_per_week: number; status: string; public_price: string | null; public_price_currency: string | null; public_price_unit: string | null;
+  duration_weeks: number | null; lessons_per_week: number | null; status: string; public_price: string | null; public_price_currency: string | null; public_price_unit: string | null;
 };
 
 export default async function CatalogAdminPage({ params }: { params: Promise<{ locale: string }> }) {

@@ -16,6 +16,9 @@ export const BranchSchema = z.object({
   phone: z.string().nullable(),
   email: z.string().nullable(),
   timezone: z.string(),
+  whatsapp: z.string().nullable().optional(),
+  number: z.number().int().nullable().optional(),
+  courseIds: z.array(uuid).optional(),
 });
 
 export const SiteSchema = z.object({
@@ -24,6 +27,8 @@ export const SiteSchema = z.object({
   branches: z.array(BranchSchema),
   legal: z.object({ privacy: z.string().nullable(), terms: z.string().nullable(), personal_data: z.string().nullable() }),
   pages: z.array(z.enum(['about', 'contacts', 'faq'])),
+  /** Содержимое главной; проверяется отдельно (SiteContentSchema), чтобы ошибка в нём не ломала сайт. */
+  settings: z.unknown().optional(),
 });
 
 export const CourseSchema = z.object({
@@ -32,10 +37,13 @@ export const CourseSchema = z.object({
   description: z.string().nullable(),
   format: z.enum(['online', 'offline', 'hybrid']),
   kind: z.enum(['group', 'individual']),
-  durationWeeks: z.number().int(),
-  lessonsPerWeek: z.number().int(),
-  language: z.object({ code: z.string(), name: z.string() }),
-  level: z.object({ code: z.string(), title: z.string(), framework: z.enum(['cefr', 'custom']), order: z.number().int() }),
+  durationWeeks: z.number().int().nullable(),
+  lessonsPerWeek: z.number().int().nullable(),
+  category: z.enum(['english', 'exams', 'languages', 'school', 'it', 'other']).nullable().optional(),
+  ageNote: z.string().nullable().optional(),
+  language: z.object({ code: z.string(), name: z.string() }).nullable(),
+  level: z.object({ code: z.string(), title: z.string(), framework: z.enum(['cefr', 'custom']), order: z.number().int() }).nullable(),
+  branchIds: z.array(uuid).optional(),
   price: z.object({ amount: z.string(), currency: z.string(), unit: z.enum(['month', 'course', 'lesson', 'hour']) }).nullable(),
   groups: z.array(
     z.object({
@@ -96,15 +104,17 @@ export interface CatalogFilters {
   level?: string | undefined;
   format?: string | undefined;
   branch?: string | undefined;
+  category?: string | undefined;
 }
 
 /** Фильтрация каталога (чистая функция, тестируется отдельно). */
 export function filterCatalog(courses: Course[], f: CatalogFilters): Course[] {
   return courses.filter(
     (c) =>
-      (!f.language || c.language.code === f.language) &&
-      (!f.level || c.level.code === f.level) &&
+      (!f.language || c.language?.code === f.language) &&
+      (!f.level || c.level?.code === f.level) &&
+      (!f.category || c.category === f.category) &&
       (!f.format || c.format === f.format || (f.format !== 'hybrid' && c.format === 'hybrid')) &&
-      (!f.branch || c.groups.some((g) => g.branchId === f.branch)),
+      (!f.branch || c.groups.some((g) => g.branchId === f.branch) || (c.branchIds ?? []).includes(f.branch)),
   );
 }

@@ -46,9 +46,9 @@ export default async function PricesPage({ params }: { params: Promise<{ locale:
                       <Link className="link" href={`/${locale}/courses/${c.id}`}>
                         {c.title}
                       </Link>{' '}
-                      <span className="text-sm text-muted">
-                        ({c.language.name}, {c.level.code})
-                      </span>
+                      {c.language || c.level ? (
+                        <span className="text-sm text-muted">({[c.language?.name, c.level?.code].filter(Boolean).join(', ')})</span>
+                      ) : null}
                     </th>
                     <td className="py-3 pr-4">{t.site.formats[c.format]}</td>
                     <td className="py-3">

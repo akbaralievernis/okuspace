@@ -14,4 +14,5 @@ const outDir = join(ROOT, 'supabase', 'demo', 'out');
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, '1-migrations.sql'), parts.join('\n'), 'utf8');
 writeFileSync(join(outDir, '2-demo-data.sql'), readFileSync(join(ROOT, 'supabase', 'demo', 'seed.sql'), 'utf8'), 'utf8');
-console.log(`Готово: supabase/demo/out/1-migrations.sql (${files.length} миграций) и 2-demo-data.sql`);
+writeFileSync(join(outDir, '3-american-dream.sql'), readFileSync(join(ROOT, 'supabase', 'seed', 'american-dream.sql'), 'utf8'), 'utf8');
+console.log(`Готово: supabase/demo/out/1-migrations.sql (${files.length} миграций), 2-demo-data.sql и 3-american-dream.sql`);
