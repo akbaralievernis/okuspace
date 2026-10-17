@@ -21,6 +21,8 @@ next-env.d.ts
 !.env.e2e
 
 # supabase local
+# демо: собранный SQL и пароли демо-аккаунтов — только локально
+/supabase/demo/out/
 /supabase/.temp/
 /supabase/.branches/
 

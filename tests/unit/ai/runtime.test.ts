@@ -26,7 +26,8 @@ afterEach(() => {
   vi.doUnmock('@/lib/logger');
 });
 
-describe('getAiProvider', () => {
+// Первый импорт модуля тянет SDK (холодная загрузка); под нагрузкой полного прогона это дольше 5 с.
+describe('getAiProvider', { timeout: 30_000 }, () => {
   it('is off by default (no AI_PROVIDER)', async () => {
     expect((await load({ AI_PROVIDER: undefined, ANTHROPIC_API_KEY: SECRET })).provider).toBeNull();
   });

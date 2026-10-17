@@ -1,0 +1,57 @@
+[
+  {
+    "email": "director@example.com",
+    "name": "Айгуль Садыкова",
+    "role": "Директор школы"
+  },
+  {
+    "email": "manager@example.com",
+    "name": "Бакыт Иманов",
+    "role": "Менеджер филиала «Центр»"
+  },
+  {
+    "email": "admin@example.com",
+    "name": "Нурия Абдыкадырова",
+    "role": "Администратор филиала «Центр»"
+  },
+  {
+    "email": "accountant@example.com",
+    "name": "Елена Ким",
+    "role": "Бухгалтер"
+  },
+  {
+    "email": "sales@example.com",
+    "name": "Тимур Осмонов",
+    "role": "Менеджер по продажам"
+  },
+  {
+    "email": "teacher@example.com",
+    "name": "Sarah Johnson",
+    "role": "Преподаватель (Центр, группа EN-A2)"
+  },
+  {
+    "email": "teacher2@example.com",
+    "name": "Азамат Токтогулов",
+    "role": "Преподаватель (Ош, группа EN-B1 онлайн)"
+  },
+  {
+    "email": "student@example.com",
+    "name": "Айдана Маматова",
+    "role": "Ученица (EN-A2)"
+  },
+  {
+    "email": "student2@example.com",
+    "name": "Эрлан Бекович",
+    "role": "Ученик (EN-A2, есть пропуски и долг)"
+  },
+  {
+    "email": "student3@example.com",
+    "name": "Мээрим Асанова",
+    "role": "Ученица (EN-B1 Ош)"
+  },
+  {
+    "email": "parent@example.com",
+    "name": "Гульнара Маматова",
+    "role": "Родитель Айданы"
+  }
+]
