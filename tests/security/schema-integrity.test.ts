@@ -74,7 +74,7 @@ describe('schema invariants (docs/architecture/DATA_MODEL.md §6)', () => {
       `select table_name, column_name, numeric_precision, numeric_scale from information_schema.columns
        where table_schema = 'public' and column_name in ('amount', 'total') and table_name not like '%balances'`,
     );
-    expect(amounts.map((a) => a.table_name).sort()).toEqual(['expenses', 'invoice_adjustments', 'invoices', 'payment_allocations', 'payments', 'tariffs']);
+    expect(amounts.map((a) => a.table_name).sort()).toEqual(['expenses', 'invoice_adjustments', 'invoices', 'payment_allocations', 'payments', 'payroll_statements', 'tariffs', 'teacher_rates']);
     for (const a of amounts) expect([a.table_name, a.numeric_precision, a.numeric_scale]).toEqual([a.table_name, 14, 2]);
   });
 

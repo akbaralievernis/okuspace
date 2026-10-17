@@ -30,6 +30,9 @@ const payloads: Record<string, Record<string, unknown>> = {
   exam_result: { examId: SESSION, title: 'Speaking', score: 40, maxScore: 50, absent: false },
   report_card: { reportId: SESSION, month: '2026-09', final: 73, grade: 3 },
   report_cards_ready: { groupId: SESSION, groupName: 'A1', month: '2026-09' },
+  payroll_approved: { month: '2026-11', amount: '1700.00', currency: 'KGS', sessions: 3 },
+  makeup_scheduled: { sessionId: SESSION, groupName: 'A1', start: '2026-11-05T12:00:00Z', timezone: 'Asia/Bishkek' },
+  substitution_assigned: { sessionId: SESSION, groupName: 'A1', start: '2026-11-05T12:00:00Z', note: 'Болезнь' },
   weekly_report: { week: '2026-42', newContacts: 3, newEnrollments: 2, received: '12000.00', attendanceMarked: 10, attendancePresent: 9, failedDeliveries: 0 },
 };
 
@@ -64,6 +67,9 @@ describe('renderNotification', () => {
     expect(renderNotification('report_card', payloads.report_card!, 'en').text).toContain('3 (73%)');
     expect(renderNotification('report_card', { month: '2026-09', final: 81.5, grade: null }, 'en').text).toContain('81.5%');
     expect(renderNotification('report_cards_ready', payloads.report_cards_ready!, 'ru').path).toBe(`/app/groups/${SESSION}/grades?month=2026-09`);
+    expect(renderNotification('payroll_approved', payloads.payroll_approved!, 'ru').text).toContain('1700.00 KGS');
+    expect(renderNotification('substitution_assigned', payloads.substitution_assigned!, 'ru').text).toContain('Болезнь');
+    expect(renderNotification('makeup_scheduled', payloads.makeup_scheduled!, 'en').path).toBe(`/app/schedule/sessions/${SESSION}`);
     expect(renderNotification('report_cards_ready', { groupId: SESSION, month: '2026-09&x=1' }, 'ru').path).toBe(`/app/groups/${SESSION}/grades`);
     const returned = renderNotification('homework_graded', { ...payloads.homework_graded, status: 'returned' }, 'ru').text;
     expect(returned).toContain(getDictionary('ru').notify.returned);

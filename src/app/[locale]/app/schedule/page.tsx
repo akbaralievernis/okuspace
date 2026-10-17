@@ -75,6 +75,13 @@ export default async function SchedulePage({ params, searchParams }: { params: P
 
   return (
     <WorkspacePage ctx={ctx} locale={locale} t={t} title={s.title} unavailable={all === null}>
+      {m.some((x) => x.status === 'active' && (can(m, 'schedule.manage', x.organizationId, x.branchId) || can(m, 'attendance.manage', x.organizationId, x.branchId))) ? (
+        <p>
+          <Link className="link" href={`/${locale}/app/schedule/makeups`}>
+            {t.auto.makeups.link}
+          </Link>
+        </p>
+      ) : null}
       <nav aria-label={s.title} className="flex flex-wrap items-center gap-4">
         <Link className="link" href={weekHref(addDays(monday, -7))}>
           {s.prevWeek}

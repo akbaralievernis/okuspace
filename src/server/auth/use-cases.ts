@@ -51,6 +51,9 @@ export type FormErrorCode =
   | 'pending_discounts';
 
 export type SuccessCode =
+  | 'billing_done'
+  | 'billing_issued'
+  | 'payroll_done'
   | 'check_email'
   | 'password_updated'
   | 'signed_out_others'

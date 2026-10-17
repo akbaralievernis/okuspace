@@ -33,6 +33,8 @@ describe('demo seed', () => {
     expect(await n('group_exams')).toBe(1);
     expect(await n('report_cards')).toBe(2);
     expect(await n('assignments')).toBe(3);
+    expect(await n('teacher_rates')).toBe(2);
+    expect(await n('makeup_requests')).toBeGreaterThanOrEqual(2); // пропуски Эрлана → отработки
     // Триггеры событий уже создали уведомления: задания, проверка, пропуски, серия пропусков.
     const kinds = (await rows<{ kind: string }>(db, 'select distinct kind from public.notifications where organization_id = $1', [ORG])).map((r) => r.kind);
     expect(kinds).toEqual(expect.arrayContaining(['homework_assigned', 'submission_received', 'homework_graded', 'absence_alert', 'manager_alert', 'task_assigned', 'announcement_ack', 'announcement', 'exam_result']));

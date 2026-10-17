@@ -39,6 +39,7 @@ export function appNav(ctx: AccessContext, locale: Locale, t: Dictionary): AppNa
   if (anyScope('schedule.manage')) items.push({ href: href('/trials'), label: t.admin.nav.trials });
   if (orgScope('site.manage')) items.push({ href: href('/site'), label: t.admin.nav.site });
   if (role('teacher')) items.push({ href: href('/profile'), label: t.admin.nav.publicProfile });
+  if (role('teacher') && !anyScope('finance.read')) items.push({ href: href('/payroll'), label: t.auto.nav.payroll });
   if (m.some((x) => x.status === 'active')) items.push({ href: href('/notifications'), label: t.schedule.navNotifications });
   items.push({ href: href('/account'), label: t.nav.account });
   return items;

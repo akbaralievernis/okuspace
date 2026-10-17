@@ -12,6 +12,7 @@ import { fmt } from '@/lib/format';
 import { DEFAULT_TIMEZONE } from '@/lib/time';
 import { requireAccess } from '@/server/auth/session';
 import { can } from '@/server/authz/check';
+import { substituteAction } from '@/server/automation/actions';
 import { cancelSessionAction, confirmCameraEventAction, markAttendanceAction, openCodeAction, rescheduleAction } from '@/server/schedule/actions';
 import { ABSENCE_REASONS, ATTENDANCE_STATUSES, localDate, markingWindow, parsePeriod } from '@/server/schedule/schemas';
 import { createUserClient } from '@/server/supabase/server';
@@ -33,7 +34,7 @@ export default async function SessionPage({ params }: { params: Promise<{ locale
   // RLS: чужое занятие неотличимо от несуществующего.
   const { data: row } = await db
     .from('lesson_sessions')
-    .select('id, organization_id, branch_id, group_id, teacher_id, classroom_id, online_url, period, status, topic, cancel_reason, groups(name, branches(timezone)), classrooms(name)')
+    .select('id, organization_id, branch_id, group_id, teacher_id, classroom_id, online_url, period, status, topic, cancel_reason, substitute_reason, groups(name, branches(timezone)), classrooms(name)')
     .eq('id', id)
     .maybeSingle();
   if (!row) notFound();
@@ -59,6 +60,11 @@ export default async function SessionPage({ params }: { params: Promise<{ locale
 
   const isTeacher = row.teacher_id === ctx.user.id || (teachers.data ?? []).some((x) => x.teacher_id === ctx.user.id);
   const canSchedule = can(m, 'schedule.manage', org, branch);
+  // Кого можно поставить на замену: активные преподаватели филиала (окончательная проверка — в БД).
+  const { data: branchTeachers } = canSchedule && status === 'scheduled'
+    ? await db.from('memberships').select('profile_id, branch_id').eq('organization_id', org).eq('role', 'teacher').eq('status', 'active')
+    : { data: [] as { profile_id: string; branch_id: string | null }[] };
+  const substituteIds = [...new Set((branchTeachers ?? []).filter((x) => x.branch_id === null || x.branch_id === branch).map((x) => x.profile_id as string))];
   const canCorrect = can(m, 'attendance.manage', org, branch);
   const opened = win.opened;
   const teacherWindow = isTeacher && win.teacherOpen;
@@ -68,7 +74,7 @@ export default async function SessionPage({ params }: { params: Promise<{ locale
 
   const recs = (records.data ?? []) as Rec[];
   const studentIds = (enrollments.data ?? []).map((e) => e.student_id as string);
-  const peopleIds = [...new Set([...studentIds, ...recs.map((r) => r.student_id), row.teacher_id as string, ...(history.data ?? []).map((h) => h.changed_by as string).filter(Boolean)])];
+  const peopleIds = [...new Set([...studentIds, ...substituteIds, ...recs.map((r) => r.student_id), row.teacher_id as string, ...(history.data ?? []).map((h) => h.changed_by as string).filter(Boolean)])];
   const { data: people } = await db.from('profiles').select('id, full_name').in('id', peopleIds);
   const nameOf = (pid: string | null) => (pid ? ((people ?? []).find((p) => p.id === pid)?.full_name as string) || '—' : '—');
   const recOf = (sid: string) => recs.find((r) => r.student_id === sid);
@@ -95,7 +101,15 @@ export default async function SessionPage({ params }: { params: Promise<{ locale
           {formatDateTime(locale, startIso, tz)} – {formatTime(locale, endIso, tz)}
         </dd>
         <dt className="font-semibold">{s.teacher}</dt>
-        <dd>{nameOf(row.teacher_id as string)}</dd>
+        <dd>
+          {nameOf(row.teacher_id as string)}
+          {row.substitute_reason ? (
+            <>
+              {' '}
+              <Badge tone="warning">{t.auto.substitute.badge}</Badge> {row.substitute_reason as string}
+            </>
+          ) : null}
+        </dd>
         <dt className="font-semibold">{s.place}</dt>
         <dd>
           {classroomName ?? s.online}
@@ -272,6 +286,29 @@ export default async function SessionPage({ params }: { params: Promise<{ locale
             </SelectField>
             <Field name="onlineUrl" label={s.onlineUrl} type="url" maxLength={500} defaultValue={(row.online_url as string | null) ?? ''} idPrefix="rs" />
             <Field name="note" label={s.note} maxLength={500} idPrefix="rs" />
+          </ActionForm>
+
+          <h2 className="text-xl font-bold">{t.auto.substitute.title}</h2>
+          <p className="text-sm text-muted">{t.auto.substitute.hint}</p>
+          <ActionForm
+            action={substituteAction}
+            submitLabel={t.auto.substitute.save}
+            pendingLabel={t.common.pending}
+            messages={msg}
+            fieldLabels={{ teacherId: t.auto.substitute.teacher, note: t.auto.substitute.reason }}
+            className="grid gap-4 sm:grid-cols-2"
+          >
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="sessionId" value={id} />
+            <SelectField name="teacherId" label={t.auto.substitute.teacher} defaultValue={row.teacher_id as string} idPrefix="sb">
+              {substituteIds.map((tid) => (
+                <option key={tid} value={tid}>
+                  {nameOf(tid)}
+                  {(teachers.data ?? []).some((x) => x.teacher_id === tid) ? ` (${t.auto.substitute.groupTeacher})` : ''}
+                </option>
+              ))}
+            </SelectField>
+            <Field name="note" label={t.auto.substitute.reason} maxLength={300} defaultValue={(row.substitute_reason as string | null) ?? ''} idPrefix="sb" />
           </ActionForm>
 
           <h2 className="text-xl font-bold">{s.cancelTitle}</h2>

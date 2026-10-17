@@ -314,6 +314,12 @@ select pg_temp.act_as('admin@example.com');
 select public.task_transition(t.id, 'start')
 from public.staff_tasks t where t.assignee_id = pg_temp.u('admin@example.com') and t.status = 'open';
 
+-- Автоматизация (блок C): ставки преподавателей за проведённое занятие.
+select pg_temp.act_as('accountant@example.com');
+insert into public.teacher_rates (organization_id, teacher_id, amount, valid_from, created_by) values
+  ('de000000-0000-4000-8000-000000000001', pg_temp.u('teacher@example.com'), 800, date_trunc('year', current_date)::date, pg_temp.u('accountant@example.com')),
+  ('de000000-0000-4000-8000-000000000001', pg_temp.u('teacher2@example.com'), 700, date_trunc('year', current_date)::date, pg_temp.u('accountant@example.com'));
+
 -- Кабинет учителя (блок B): экзамен с результатами и задание одному ученику.
 select pg_temp.act_as('teacher@example.com');
 insert into public.group_exams (id, organization_id, branch_id, group_id, title, held_on, max_score, created_by)

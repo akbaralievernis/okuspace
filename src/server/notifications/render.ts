@@ -69,6 +69,8 @@ export function renderNotification(kind: string, payload: Record<string, unknown
     attendance: Number(p.attendanceMarked) > 0 ? `${Math.round((100 * Number(p.attendancePresent)) / Number(p.attendanceMarked))}%` : '—',
     failed: String(p.failedDeliveries ?? 0),
     actor: str(p.actorName),
+    pay: `${str(p.amount, '0.00')} ${str(p.currency, 'KGS')}`,
+    count: String(p.sessions ?? 0),
   };
   let text = fmt(n.text[k], vars);
   if (typeof p.note === 'string' && p.note) text += ` ${fmt(n.note, { note: p.note })}`;
@@ -107,6 +109,11 @@ function pathFor(kind: NotificationKind, p: Record<string, unknown>): string {
     case 'task_comment':
     case 'task_overdue':
       return id(p.taskId) ? `/app/tasks/${id(p.taskId)}` : '/app/tasks';
+    case 'payroll_approved':
+      return '/app/payroll';
+    case 'makeup_scheduled':
+    case 'substitution_assigned':
+      return id(p.sessionId) ? `/app/schedule/sessions/${id(p.sessionId)}` : '/app/schedule';
     case 'exam_result':
     case 'report_card':
       return '/app/learn/reports';
