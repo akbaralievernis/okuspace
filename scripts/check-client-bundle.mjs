@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const STATIC_DIR = '.next/static';
-const SERVER_ENV_NAMES = ['SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ANTHROPIC_API_KEY', 'PAYMENT_WEBHOOK_SECRET', 'OPENAI_API_KEY', 'DATABASE_URL'];
+const SERVER_ENV_NAMES = ['SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ANTHROPIC_API_KEY', 'PAYMENT_WEBHOOK_SECRET', 'CRON_SECRET', 'RESEND_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET', 'OPENAI_API_KEY', 'DATABASE_URL'];
 const SECRET_PATTERNS = [/sb_secret_[A-Za-z0-9_-]{8,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /\bsk-[A-Za-z0-9]{20,}/, /\bsk-ant-[A-Za-z0-9_-]{20,}/, /service_role/];
 
 if (!existsSync(STATIC_DIR)) {

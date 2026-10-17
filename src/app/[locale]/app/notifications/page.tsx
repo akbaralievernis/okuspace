@@ -4,14 +4,13 @@ import { Badge, EmptyState } from '@/components/ui/notice';
 import { ActionForm } from '@/features/admin/action-form';
 import { WorkspacePage, authMessages } from '@/features/admin/workspace-page';
 import { formatShortDateTime } from '@/features/site/format';
-import { isLocale, type Locale } from '@/i18n/config';
-import type { Dictionary } from '@/i18n/dictionaries/ru';
+import { isLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
-import { fmt } from '@/lib/format';
 import { DEFAULT_TIMEZONE } from '@/lib/time';
 import { requireAccess } from '@/server/auth/session';
+import { renderNotification } from '@/server/notifications/render';
 import { markNotificationsReadAction } from '@/server/schedule/actions';
-import { myNotifications, type Notification } from '@/server/schedule/queries';
+import { myNotifications } from '@/server/schedule/queries';
 
 export default async function NotificationsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -19,11 +18,17 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
   const ctx = await requireAccess(locale, `/${locale}/app/notifications`);
   const t = getDictionary(locale);
   const s = t.schedule;
+  const n = t.notify;
   const items = await myNotifications();
-  const unread = (items ?? []).filter((n) => !n.readAt).length;
+  const unread = (items ?? []).filter((x) => !x.readAt).length;
 
   return (
     <WorkspacePage ctx={ctx} locale={locale} t={t} title={s.notificationsTitle} unavailable={items === null}>
+      <p>
+        <Link className="link" href={`/${locale}/app/notifications/settings`}>
+          {n.settingsLink}
+        </Link>
+      </p>
       {unread > 0 ? (
         <ActionForm action={markNotificationsReadAction} submitLabel={s.markAllRead} pendingLabel={t.common.pending} messages={authMessages(t)} variant="secondary">
           <input type="hidden" name="locale" value={locale} />
@@ -33,46 +38,37 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
         <EmptyState title={s.noNotifications} />
       ) : (
         <ul className="space-y-2">
-          {(items ?? []).map((n) => (
-            <li key={n.id} className="space-y-1 rounded-[var(--radius-control)] border border-border px-3 py-2">
-              <p>
-                {!n.readAt ? (
-                  <>
-                    <Badge tone="brand">{s.unread}</Badge>{' '}
-                  </>
-                ) : null}
-                {describe(n, locale, t)}
-              </p>
-              {typeof n.payload.note === 'string' && n.payload.note ? <p className="text-sm">{fmt(s.notifNote, { note: n.payload.note })}</p> : null}
-              <p className="flex flex-wrap gap-3 text-sm text-muted">
-                <span>{formatShortDateTime(locale, n.createdAt, tzOf(n))}</span>
-                {n.kind === 'monitoring_alert' ? (
-                  <Link className="link" href={`/${locale}/app/monitoring`}>
+          {(items ?? []).map((item) => {
+            // Текст собирается на языке читателя из данных события (тот же, что уходит в email/Telegram).
+            const r = renderNotification(item.kind, item.payload, locale);
+            const tz = typeof item.payload.timezone === 'string' ? item.payload.timezone : DEFAULT_TIMEZONE;
+            return (
+              <li key={item.id} className="space-y-1 rounded-[var(--radius-control)] border border-border px-3 py-2">
+                <p className="font-semibold">
+                  {!item.readAt ? (
+                    <>
+                      <Badge tone="brand">{s.unread}</Badge>{' '}
+                    </>
+                  ) : null}
+                  {r.title}
+                </p>
+                <p>{r.text}</p>
+                <p className="flex flex-wrap gap-3 text-sm text-muted">
+                  <span>{formatShortDateTime(locale, item.createdAt, tz)}</span>
+                  {item.deliveries.map((d) => (
+                    <span key={d.channel}>
+                      {n.channelNames[d.channel as keyof typeof n.channelNames] ?? d.channel}: {n.delivery[d.status as keyof typeof n.delivery] ?? d.status}
+                    </span>
+                  ))}
+                  <Link className="link" href={`/${locale}${r.path}`}>
                     {s.open}
                   </Link>
-                ) : typeof n.payload.sessionId === 'string' ? (
-                  <Link className="link" href={`/${locale}/app/schedule/sessions/${n.payload.sessionId}`}>
-                    {s.open}
-                  </Link>
-                ) : null}
-              </p>
-            </li>
-          ))}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       )}
     </WorkspacePage>
   );
-}
-
-const tzOf = (n: Notification) => (typeof n.payload.timezone === 'string' ? n.payload.timezone : DEFAULT_TIMEZONE);
-
-/** Текст уведомления строится из данных события на языке читателя, а не хранится готовой строкой. */
-function describe(n: Notification, locale: Locale, t: Dictionary): string {
-  const s = t.schedule;
-  if (n.kind === 'monitoring_alert') return s.notif.monitoring_alert;
-  const p = n.payload;
-  const tz = tzOf(n);
-  const when = (v: unknown) => (typeof v === 'string' ? formatShortDateTime(locale, v, tz) : '—');
-  const kinds = Array.isArray(p.kinds) ? p.kinds.map((k) => s.changeKinds[k as 'rescheduled'] ?? String(k)).join(', ') : '';
-  return fmt(s.notif[n.kind], { group: typeof p.groupName === 'string' ? p.groupName : '—', old: when(p.oldStart), new: when(p.newStart), kinds });
 }

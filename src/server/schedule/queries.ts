@@ -46,21 +46,24 @@ export async function scheduleWindow(from: Date, to: Date): Promise<SessionItem[
 
 export interface Notification {
   id: string;
-  kind: 'session_rescheduled' | 'session_cancelled' | 'session_changed' | 'monitoring_alert';
+  kind: string;
   payload: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
+  /** Статусы внешней доставки (email/Telegram), если она была. */
+  deliveries: { channel: string; status: string }[];
 }
 
 export async function myNotifications(limit = 100): Promise<Notification[] | null> {
   const db = await createUserClient();
-  const { data, error } = await db.from('notifications').select('id, kind, payload, read_at, created_at').order('created_at', { ascending: false }).limit(limit);
+  const { data, error } = await db.from('notifications').select('id, kind, payload, read_at, created_at, notification_deliveries(channel, status)').order('created_at', { ascending: false }).limit(limit);
   if (error) return null;
   return (data ?? []).map((n) => ({
     id: n.id as string,
-    kind: n.kind as Notification['kind'],
+    kind: n.kind as string,
     payload: (n.payload ?? {}) as Record<string, unknown>,
     readAt: (n.read_at as string | null) ?? null,
     createdAt: n.created_at as string,
+    deliveries: ((n.notification_deliveries ?? []) as { channel: string; status: string }[]).map((d) => ({ channel: d.channel, status: d.status })),
   }));
 }

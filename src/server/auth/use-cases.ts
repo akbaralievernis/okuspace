@@ -66,7 +66,8 @@ export type SuccessCode =
   | 'practice_checked'
   | 'imported'
   | 'device_created'
-  | 'checked';
+  | 'checked'
+  | 'telegram_code';
 
 export type FormState =
   | { status: 'idle' }

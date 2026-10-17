@@ -152,7 +152,7 @@ describe('schedule changes are logged and notify the right people', () => {
       const seen: Record<string, { kind: string; note: string; oldStart: string }[]> = {};
       for (const user of [U.studentA1, U.parentA1, U.teacherA1, U.adminA1, U.studentA1b, U.teacherA1b]) {
         await switchTo(tx, user);
-        seen[user] = await rows(tx, `select kind, payload ->> 'note' as note, payload ->> 'oldStart' as "oldStart" from public.notifications`);
+        seen[user] = await rows(tx, `select kind, payload ->> 'note' as note, payload ->> 'oldStart' as "oldStart" from public.notifications where kind like 'session_%'`);
       }
       return { changes, seen };
     });
@@ -172,9 +172,9 @@ describe('schedule changes are logged and notify the right people', () => {
       ]);
       await switchTo(tx, U.adminA1, 'aal2');
       await tx.query(`update public.lesson_sessions set online_url = 'https://meet.example.test/moved' where id = $1`, [S_SOON]);
-      const author = await count(tx, 'select 1 from public.notifications');
+      const author = await count(tx, `select 1 from public.notifications where kind like 'session_%'`);
       await switchTo(tx, U.teacherA1);
-      return { author, teacher: await count(tx, 'select 1 from public.notifications') };
+      return { author, teacher: await count(tx, `select 1 from public.notifications where kind like 'session_%'`) };
     });
     expect(r).toEqual({ author: 0, teacher: 1 });
   });
@@ -183,7 +183,7 @@ describe('schedule changes are logged and notify the right people', () => {
     const kinds = await as(db, U.adminA1, async (tx) => {
       await tx.query(`update public.lesson_sessions set status = 'cancelled', cancel_reason = 'public holiday' where id = $1`, [S_SOON]);
       await switchTo(tx, U.studentA1);
-      return rows<{ kind: string; note: string }>(tx, `select kind, payload ->> 'note' as note from public.notifications`);
+      return rows<{ kind: string; note: string }>(tx, `select kind, payload ->> 'note' as note from public.notifications where kind like 'session_%'`);
     });
     expect(kinds).toEqual([{ kind: 'session_cancelled', note: 'public holiday' }]);
     await expectDenied(
@@ -224,9 +224,9 @@ describe('schedule changes are logged and notify the right people', () => {
     const r = await as(db, U.adminA1, async (tx) => {
       await tx.query(`update public.lesson_sessions set online_url = 'https://meet.example.test/new' where id = $1`, [S_SOON]);
       await switchTo(tx, U.parentA1);
-      const own = (await tx.query(`update public.notifications set read_at = now()`)).affectedRows;
+      const own = (await tx.query(`update public.notifications set read_at = now() where kind like 'session_%'`)).affectedRows;
       await switchTo(tx, U.studentA1b);
-      const foreign = (await tx.query(`update public.notifications set read_at = now()`)).affectedRows;
+      const foreign = (await tx.query(`update public.notifications set read_at = now() where kind like 'session_%'`)).affectedRows;
       return { own, foreign };
     });
     expect(r).toEqual({ own: 1, foreign: 0 });

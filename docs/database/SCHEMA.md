@@ -17,6 +17,7 @@
 | `20261020100000_crm` (этап 8) | право `crm.admin` (директор, менеджер филиала; MFA); `crm_contacts` (нормализованный телефон, уникальность телефона/email в школе), `crm_events` (история, append-only, только обезличивание), `crm_reminders`, `crm_trial_bookings` (общие места со слотами сайта), `crm_exports` (журнал выгрузок); `lead_requests.contact_id`; `submit_lead_request` и `public_trial_slots` пересозданы: заявка сразу попадает в CRM; функции `crm_book_trial`, `crm_trial_result`, `crm_convert`, `crm_enroll`, `crm_import`, `crm_export`, `crm_erase`, `crm_purge_stale` (service role), `crm_funnel` |
 | `20261021100000_finance_module` (этап 9) | право `finance.approve` (директор, менеджер филиала; MFA); `finance_periods`; `price_lists`, `tariffs` (цена неизменна); `invoice_lines` (сумма черновика считается в БД); `invoice_adjustments` (скидка/кредит/дебет, утверждение другим человеком); `invoice_status_history`; распределения получили «освобождение» (`kind = release`); платежи — источник `staff`/`provider`; `expenses` (сторно); `payment_webhook_events` + `record_provider_payment` (только service role); представление `invoice_balances` пересоздано (+ `due`); `finance_report`, `finance_debts` |
 | `20261022100000_monitoring` (этап 10) | права `monitoring.view` (директор, менеджер филиала, администратор) и `monitoring.manage` (директор, менеджер филиала; MFA); `monitoring_policies` (выключено без цели, основания, уведомления и юридической проверки); `camera_devices` (только хеш токена); `occupancy_snapshots`, `zone_crossings` (только числа, без политик — чтение через функции); `monitoring_alerts` (очередь проверки), `monitoring_access_log`; `ingest_monitoring` и `monitoring_purge` (service role), `monitoring_check`, `monitoring_room_timeline`, `room_utilization`; вид уведомления `monitoring_alert` |
+| `20261023100000_notifications` (этап 11) | справочник `notification_kinds` (14 видов: обязательные/необязательные, важные); `notifications.kind` — внешний ключ на справочник; `notification_preferences` (важное в кабинете не выключается), `notification_channels` (привязанный Telegram), `telegram_link_codes` (только хеш, без политик); очередь `notification_deliveries` (статус, попытки, следующая попытка, ошибка); триггеры событий (домашние задания, работы, результаты тестов, пропуски, серия пропусков); `notify`, `wants`, `enqueue_deliveries`; `generate_scheduled_notifications`, `claim_deliveries`, `complete_delivery`, `link_telegram` (service role), `create_telegram_link_code` |
 
 ## 1. Таблицы
 
@@ -88,6 +89,13 @@
 - `occupancy_snapshots`, `zone_crossings` (только числа; удаляет только процедура хранения)
 - `monitoring_alerts`, `monitoring_access_log` (append-only)
 
+**Уведомления (этап 11)**
+
+- `notification_kinds` (справочник видов)
+- `notification_preferences`, `notification_channels`
+- `notification_deliveries` (очередь доставки; меняет только service role)
+- `telegram_link_codes` (только хеш, без политик: только функции)
+
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
 **Аудит:** `audit_logs`. Записи добавляются триггерами по изменениям:
@@ -103,7 +111,7 @@
 
 | Таблицы | Этап | Причина |
 |---|---|---|
-| `notifications`, `files`, `integrations` | 11 / 5 | Вместе с очередью уведомлений и загрузкой файлов |
+| `files`, `integrations` | — | Загрузка файлов и прочие интеграции — по мере необходимости (уведомления и очередь доставки сделаны на этапе 11) |
 
 ## 2. Инварианты, закреплённые в БД
 
@@ -310,3 +318,32 @@
 
 Тесты — `tests/security/monitoring.test.ts` (13).
 
+## 13. Уведомления и автоматизация (этап 11)
+
+**Одно событие — одно уведомление.** Уведомление создаёт только `app.notify(...)` — из триггера события или из `generate_scheduled_notifications`. Уникальный `(recipient_id, dedupe_key)` + `on conflict do nothing`: повторная обработка события (повтор триггера, повторный запуск планировщика) дублей не создаёт. Ключи включают id события и получателя; для проверки работы — ещё и статус и момент проверки; для просрочки — ISO-неделю (не чаще раза в неделю); для отчёта — неделю.
+
+**События.**
+
+| Вид | Источник | Получатели |
+|---|---|---|
+| `session_rescheduled` / `session_cancelled` / `session_changed` | триггер занятий (этап 6) | ученики группы, опекуны, преподаватели |
+| `lesson_reminder` | планировщик: занятия в ближайшие 24 ч | активные ученики группы, преподаватель |
+| `homework_assigned` | задание опубликовано | ученики группы |
+| `submission_received` | работа сдана | преподаватели группы |
+| `homework_graded` | работа проверена или возвращена | ученик |
+| `test_result` | попытка теста завершена | ученик и опекуны |
+| `absence_alert` | отметка «отсутствовал» | ученик и опекуны |
+| `manager_alert` | второй пропуск подряд в группе | менеджер, администраторы филиала, директор |
+| `payment_due` / `payment_overdue` | планировщик: за 3 дня до срока / раз в неделю после | плательщик (ученик и опекуны) |
+| `monitoring_alert` | мониторинг (этап 10) | ответственные филиала |
+| `weekly_report` | планировщик: понедельник по времени школы | директор |
+
+**Настройки.** `app.wants(profile, kind, channel)`: явная настройка, иначе по умолчанию — в кабинете всё, во внешних каналах только важное. Важное (`optional = false`) в кабинете выключить нельзя (триггер). Получатель меняет только свои настройки и отвязывает только свой канал.
+
+**Доставка.** При создании уведомления триггер ставит в очередь `notification_deliveries` по одной строке на канал (уникальный `(notification_id, channel)`), если получатель хочет этот канал и у него есть адрес. Статусы: `pending → sending → sent | retry | failed | skipped`. `claim_deliveries` захватывает пачку `FOR UPDATE SKIP LOCKED` (параллельные обработчики не берут одно и то же), повторно забирает «зависшие» в `sending` дольше 10 минут. `complete_delivery`: ошибка → `retry` с задержкой 2^n минут, после 5 попыток — `failed`; постоянная ошибка или нет канала → `skipped`; завершить можно только захваченную доставку. CHECK: `sent` тогда и только тогда, когда есть `sent_at`. Отправка идёт после записи события в отдельной транзакции, поэтому сбой провайдера не влияет на основное действие.
+
+**Видимость.** Доставки видит получатель и `audit.read` школы (`app.can_see_delivery`). Функции очереди и планировщика — только service role.
+
+**Telegram.** Привязка — одноразовым кодом (10 hex-символов, в БД SHA-256, 15 минут, удаляется при использовании): пользователь получает код в настройках и отправляет боту `/start КОД`; webhook проверяет секретный заголовок. Один чат — один профиль.
+
+Тесты — `tests/security/notifications.test.ts` (12), unit — `tests/unit/notifications/*` (19).
