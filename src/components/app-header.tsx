@@ -21,6 +21,9 @@ export function appNav(ctx: AccessContext, locale: Locale, t: Dictionary): AppNa
   const href = (path: string) => `/${locale}/app${path}`;
   const role = (r: string) => m.some((x) => x.role === r && x.status === 'active');
   const items: AppNavItem[] = [{ href: href(''), label: t.nav.workspace }];
+  if (anyScope('dashboard.read')) items.push({ href: href('/dashboard'), label: t.mgmt.nav.dashboard });
+  if (m.some((x) => x.status === 'active' && !['student', 'parent'].includes(x.role))) items.push({ href: href('/tasks'), label: t.mgmt.nav.tasks });
+  if (m.some((x) => x.status === 'active')) items.push({ href: href('/announcements'), label: t.mgmt.nav.announcements });
   if (m.some((x) => x.status === 'active')) items.push({ href: href('/schedule'), label: t.schedule.nav });
   if (m.some((x) => x.status === 'active')) items.push({ href: href('/ai'), label: t.ai.nav });
   if (role('student') || role('parent')) items.push({ href: href('/learn'), label: t.lms.nav.learn });

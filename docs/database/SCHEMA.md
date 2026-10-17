@@ -18,6 +18,7 @@
 | `20261021100000_finance_module` (этап 9) | право `finance.approve` (директор, менеджер филиала; MFA); `finance_periods`; `price_lists`, `tariffs` (цена неизменна); `invoice_lines` (сумма черновика считается в БД); `invoice_adjustments` (скидка/кредит/дебет, утверждение другим человеком); `invoice_status_history`; распределения получили «освобождение» (`kind = release`); платежи — источник `staff`/`provider`; `expenses` (сторно); `payment_webhook_events` + `record_provider_payment` (только service role); представление `invoice_balances` пересоздано (+ `due`); `finance_report`, `finance_debts` |
 | `20261022100000_monitoring` (этап 10) | права `monitoring.view` (директор, менеджер филиала, администратор) и `monitoring.manage` (директор, менеджер филиала; MFA); `monitoring_policies` (выключено без цели, основания, уведомления и юридической проверки); `camera_devices` (только хеш токена); `occupancy_snapshots`, `zone_crossings` (только числа, без политик — чтение через функции); `monitoring_alerts` (очередь проверки), `monitoring_access_log`; `ingest_monitoring` и `monitoring_purge` (service role), `monitoring_check`, `monitoring_room_timeline`, `room_utilization`; вид уведомления `monitoring_alert` |
 | `20261023100000_notifications` (этап 11) | справочник `notification_kinds` (14 видов: обязательные/необязательные, важные); `notifications.kind` — внешний ключ на справочник; `notification_preferences` (важное в кабинете не выключается), `notification_channels` (привязанный Telegram), `telegram_link_codes` (только хеш, без политик); очередь `notification_deliveries` (статус, попытки, следующая попытка, ошибка); триггеры событий (домашние задания, работы, результаты тестов, пропуски, серия пропусков); `notify`, `wants`, `enqueue_deliveries`; `generate_scheduled_notifications`, `claim_deliveries`, `complete_delivery`, `link_telegram` (service role), `create_telegram_link_code` |
+| `20261024100000_management` (блок A) | права `task.manage` (директор, менеджер филиала; MFA), `announcement.publish` (директор, менеджер, администратор; MFA), `dashboard.read` (директор, менеджер, администратор); `staff_tasks` + `staff_task_events` (append-only); `announcements` (неизменны после публикации) + `announcement_recipients`; функции `task_create`, `task_transition`, `task_comment`, `generate_task_reminders` (service role), `announcement_publish`, `announcement_read`, `announcement_archive`, `announcement_stats`, `branch_dashboard`; 9 видов уведомлений |
 
 ## 1. Таблицы
 
@@ -95,6 +96,12 @@
 - `notification_preferences`, `notification_channels`
 - `notification_deliveries` (очередь доставки; меняет только service role)
 - `telegram_link_codes` (только хеш, без политик: только функции)
+
+**Управление (блок A)**
+
+- `staff_tasks`, `staff_task_events` (append-only)
+- `announcements` (после публикации меняется только архивирование), `announcement_recipients`
+- все четыре только читаются пользователями; изменения — функциями
 
 **Финансы:** `invoices`, `payments` (тип `payment` или `refund`), `payment_allocations`; представление `invoice_balances` (`security_invoker`).
 
@@ -347,3 +354,40 @@
 **Telegram.** Привязка — одноразовым кодом (10 hex-символов, в БД SHA-256, 15 минут, удаляется при использовании): пользователь получает код в настройках и отправляет боту `/start КОД`; webhook проверяет секретный заголовок. Один чат — один профиль.
 
 Тесты — `tests/security/notifications.test.ts` (12), unit — `tests/unit/notifications/*` (19).
+
+## 14. Управление филиалами (блок A)
+
+**Задачи.** Одна задача — один исполнитель. Рассылка в несколько филиалов создаёт несколько задач с общим `batch_id`: каждая выполняется, сдаётся и принимается отдельно, а руководитель видит прогресс всей рассылки.
+
+| Действие | Кто | Условия |
+|---|---|---|
+| поставить (`task_create`) | `task.manage` в филиале задачи, MFA | исполнитель — активный сотрудник этого филиала (менеджер, администратор, продажи, бухгалтер, преподаватель) или сотрудник уровня школы для задачи уровня школы; не сам автор; срок в будущем; до 50 исполнителей |
+| взять в работу / сдать отчёт | исполнитель | `open → in_progress`; сдача из `open`/`in_progress` только с отчётом |
+| принять / вернуть / отменить | автор задачи или директор школы, MFA | `task.manage` в филиале задачи; **не исполнитель** (даже если позже получил права уровня школы); возврат — с комментарием, отмена — с причиной |
+| комментарий | исполнитель или руководитель охвата (MFA) | уведомляется другая сторона |
+
+Каждый шаг пишется в `staff_task_events` (append-only, запрет даже для service role). Просроченные (`open`/`in_progress` со сроком в прошлом) — одно напоминание исполнителю и одно автору (`generate_task_reminders`, планировщик).
+
+**Видимость.** Задачу видят исполнитель и `task.manage` в её филиале: менеджер филиала видит задачи своего филиала, директор — все.
+
+**Объявления.** Адресуются филиалу (или всей школе — только уровень школы) и ролям получателей. Получатели фиксируются при публикации (`announcement_recipients`, `recipient_count`); автор в получатели не входит; без получателей публикация отклоняется. После публикации текст, адресаты и автор неизменны (триггер); удалить нельзя — только в архив (автор или директор). Получатель видит свою квитанцию; открытие страницы отмечает «прочитано», подтверждение — отдельным действием и только если оно запрошено. Статистику (`announcement_stats`) и список квитанций видят только те, кто публикует в охвате объявления.
+
+**Панель (`branch_dashboard(org, from, to)`).** Филиалы с `dashboard.read`. Период — даты по часовому поясу школы, включительно.
+
+| Показатель | Определение |
+|---|---|
+| ученики | разные ученики с активной записью в группы филиала (на сегодня) |
+| группы / преподаватели | группы `planned`/`active`; разные преподаватели этих групп |
+| занятия | по началу в периоде: `planned` = не отменённые, `done`, `cancelled` |
+| без отметок | прошедшие неотменённые занятия периода без единой отметки посещаемости |
+| посещаемость | `present`+`late`+`left_early` / все отметки, кроме `excused` |
+| работы ждут проверки | `submitted` (на сегодня); просрочены — сданы > 72 ч назад |
+| обращения | контакты CRM филиала, созданные в периоде; из них `won` (как `crm_funnel`) |
+| задачи | открытые (`open`/`in_progress`/`submitted`) и просроченные на сегодня; выполнены — `completed_at` в периоде |
+| объявления | подтверждения по объявлениям периода с запросом подтверждения |
+| финансы | только при `finance.read` в филиале; поступило/возвраты — как `finance_report`; долг — остаток выставленных счетов; просрочен — со сроком до сегодня |
+
+Тесты сверяют каждый показатель с прямым запросом к данным, а финансы — с `finance_report`.
+
+Тесты — `tests/security/management.test.ts` (17), unit — `tests/unit/management/period.test.ts` (4).
+

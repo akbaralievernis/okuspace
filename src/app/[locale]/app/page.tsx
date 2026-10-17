@@ -15,7 +15,14 @@ export default async function WorkspacePage({ params }: { params: Promise<{ loca
   const t = getDictionary(locale);
   const mine = await visibleMemberships({ profileId: ctx.user.id });
   // Уведомление о мониторинге аудиторий — всем участникам школы, где он включён.
-  const { data: monitored } = await (await createUserClient()).from('monitoring_policies').select('organization_id').eq('enabled', true).not('notice_published_at', 'is', null);
+  const db = await createUserClient();
+  const [{ data: monitored }, { count: openTasks }, { data: pendingAck }] = await Promise.all([
+    db.from('monitoring_policies').select('organization_id').eq('enabled', true).not('notice_published_at', 'is', null),
+    db.from('staff_tasks').select('id', { count: 'exact', head: true }).eq('assignee_id', ctx.user.id).in('status', ['open', 'in_progress']),
+    db.from('announcement_recipients').select('announcement_id, announcements!inner(requires_ack, status)').eq('profile_id', ctx.user.id).is('acknowledged_at', null)
+      .eq('announcements.requires_ack', true).eq('announcements.status', 'published').limit(50),
+  ]);
+  const toAck = (pendingAck ?? []).length;
 
   return (
     <>
@@ -29,6 +36,25 @@ export default async function WorkspacePage({ params }: { params: Promise<{ loca
               {t.monitoring.noticeOpen}
             </Link>
           </p>
+        ) : null}
+
+        {(openTasks ?? 0) > 0 || toAck > 0 ? (
+          <ul className="mt-4 space-y-1 rounded-[var(--radius-control)] border-l-4 border-brand-700 bg-surface-muted px-4 py-3 text-sm">
+            {(openTasks ?? 0) > 0 ? (
+              <li>
+                <Link className="link" href={`/${locale}/app/tasks`}>
+                  {fmt(t.mgmt.homeTasks, { n: String(openTasks) })}
+                </Link>
+              </li>
+            ) : null}
+            {toAck > 0 ? (
+              <li>
+                <Link className="link" href={`/${locale}/app/announcements`}>
+                  {fmt(t.mgmt.homeAck, { n: String(toAck) })}
+                </Link>
+              </li>
+            ) : null}
+          </ul>
         ) : null}
 
         <h2 className="mt-8 text-lg font-semibold">{t.app.membershipsTitle}</h2>

@@ -280,6 +280,41 @@ select 'de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-00000000
 from generate_series(current_date + 2, current_date + 9, interval '3 days') as d;
 
 
+-- ---------------------------------------------------------------------------
+-- Управление (блок A): задачи директора филиалам и объявление
+-- Действуем от имени пользователей (claims как у PostgREST, с MFA) — права проверяют функции БД.
+-- ---------------------------------------------------------------------------
+create or replace function pg_temp.act_as(p_email text) returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.u(p_email), 'role', 'authenticated', 'aal', 'aal2')::text, true);
+end $$;
+
+select pg_temp.act_as('director@example.com');
+select public.task_create('de000000-0000-4000-8000-000000000001',
+  jsonb_build_array(
+    jsonb_build_object('profileId', pg_temp.u('admin@example.com'), 'branchId', 'de100000-0000-4000-8000-000000000001'),
+    jsonb_build_object('profileId', pg_temp.u('teacher2@example.com'), 'branchId', 'de100000-0000-4000-8000-000000000002')),
+  'Проверить журналы посещаемости за неделю', 'Отметить все прошедшие занятия и сообщить о пропусках родителям.', 'high', now() + interval '2 days');
+select public.task_create('de000000-0000-4000-8000-000000000001',
+  jsonb_build_array(jsonb_build_object('profileId', pg_temp.u('manager@example.com'), 'branchId', 'de100000-0000-4000-8000-000000000001')),
+  'Подготовить план набора на ноябрь', 'Сколько групп откроем, нужны ли новые преподаватели.', 'normal', now() + interval '5 days');
+select public.task_create('de000000-0000-4000-8000-000000000001',
+  jsonb_build_array(jsonb_build_object('profileId', pg_temp.u('accountant@example.com'), 'branchId', null)),
+  'Сверить оплаты за месяц', null, 'normal', now() + interval '3 days');
+select public.announcement_publish('de000000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001',
+  'Изменение расписания на праздники', 'В праздничные дни занятия группы EN-A2 переносятся. Новое расписание — в разделе «Расписание».',
+  array['teacher', 'student', 'parent'], true);
+select public.announcement_publish('de000000-0000-4000-8000-000000000001', null,
+  'Собрание руководителей в пятницу', 'Собрание в 10:00 онлайн. Подготовьте итоги месяца по своему филиалу.',
+  array['branch_manager', 'admin', 'accountant'], false);
+
+-- Администратор взял задачу в работу (без MFA — так работает исполнитель).
+select pg_temp.act_as('admin@example.com');
+select public.task_transition(t.id, 'start')
+from public.staff_tasks t where t.assignee_id = pg_temp.u('admin@example.com') and t.status = 'open';
+select set_config('request.jwt.claims', '', true);
+
 select 'Демо-данные загружены' as result,
        (select count(*) from public.lesson_sessions where organization_id = 'de000000-0000-4000-8000-000000000001') as sessions,
        (select count(*) from public.notifications where organization_id = 'de000000-0000-4000-8000-000000000001') as notifications;

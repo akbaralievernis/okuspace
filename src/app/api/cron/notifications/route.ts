@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Плановые задачи (Vercel Cron или любой планировщик с секретом CRON_SECRET):
- *  1) уведомления по расписанию (напоминания, оплата, еженедельный отчёт) — без дублей;
+ *  1) уведомления по расписанию (напоминания, оплата, еженедельный отчёт, просроченные задачи) — без дублей;
  *  2) доставка очереди во внешние каналы — статусы, повторы, ошибки;
  *  3) удаление по срокам хранения (мониторинг; контакты CRM — 24 месяца без активности).
  * Каждая задача независима: сбой одной не отменяет остальные.
@@ -29,6 +29,11 @@ export async function GET(request: NextRequest) {
 
   await step('scheduled', async () => {
     const { data, error } = await db.rpc('generate_scheduled_notifications', {});
+    if (error) throw new Error(error.code);
+    return data;
+  });
+  await step('tasks', async () => {
+    const { data, error } = await db.rpc('generate_task_reminders', {});
     if (error) throw new Error(error.code);
     return data;
   });

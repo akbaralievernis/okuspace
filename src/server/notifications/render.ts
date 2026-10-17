@@ -56,6 +56,7 @@ export function renderNotification(kind: string, payload: Record<string, unknown
     received: `${str(p.received, '0.00')} KGS`,
     attendance: Number(p.attendanceMarked) > 0 ? `${Math.round((100 * Number(p.attendancePresent)) / Number(p.attendanceMarked))}%` : '—',
     failed: String(p.failedDeliveries ?? 0),
+    actor: str(p.actorName),
   };
   let text = fmt(n.text[k], vars);
   if (typeof p.note === 'string' && p.note) text += ` ${fmt(n.note, { note: p.note })}`;
@@ -86,6 +87,17 @@ function pathFor(kind: NotificationKind, p: Record<string, unknown>): string {
       return '/app/monitoring';
     case 'weekly_report':
       return '/app/finance';
+    case 'task_assigned':
+    case 'task_submitted':
+    case 'task_returned':
+    case 'task_accepted':
+    case 'task_cancelled':
+    case 'task_comment':
+    case 'task_overdue':
+      return id(p.taskId) ? `/app/tasks/${id(p.taskId)}` : '/app/tasks';
+    case 'announcement':
+    case 'announcement_ack':
+      return id(p.announcementId) ? `/app/announcements/${id(p.announcementId)}` : '/app/announcements';
     default:
       return '/app/notifications';
   }

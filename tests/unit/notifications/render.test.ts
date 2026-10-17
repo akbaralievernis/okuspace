@@ -18,6 +18,15 @@ const payloads: Record<string, Record<string, unknown>> = {
   payment_overdue: { number: 'N-0002', dueOn: '2026-10-01', outstanding: '900.00', currency: 'KGS' },
   manager_alert: { sessionId: SESSION, groupName: 'A1', start: '2026-10-20T08:00:00Z' },
   monitoring_alert: {},
+  task_assigned: { taskId: SESSION, title: 'Отчёт', dueAt: '2026-10-25T12:00:00Z', actorName: 'Айгуль', priority: 'high' },
+  task_submitted: { taskId: SESSION, title: 'Отчёт', actorName: 'Нурия', note: 'Готово' },
+  task_returned: { taskId: SESSION, title: 'Отчёт', actorName: 'Айгуль', note: 'Добавьте цифры' },
+  task_accepted: { taskId: SESSION, title: 'Отчёт', actorName: 'Айгуль' },
+  task_cancelled: { taskId: SESSION, title: 'Отчёт', actorName: 'Айгуль', note: 'Не нужно' },
+  task_comment: { taskId: SESSION, title: 'Отчёт', actorName: 'Нурия', note: 'Вопрос' },
+  task_overdue: { taskId: SESSION, title: 'Отчёт', dueAt: '2026-10-20T12:00:00Z', actorName: 'Нурия' },
+  announcement: { announcementId: SESSION, title: 'Собрание', actorName: 'Айгуль' },
+  announcement_ack: { announcementId: SESSION, title: 'Новые правила', actorName: 'Айгуль' },
   weekly_report: { week: '2026-42', newContacts: 3, newEnrollments: 2, received: '12000.00', attendanceMarked: 10, attendancePresent: 9, failedDeliveries: 0 },
 };
 
@@ -42,6 +51,11 @@ describe('renderNotification', () => {
     expect(renderNotification('lesson_reminder', payloads.lesson_reminder!, 'ru').path).toBe(`/app/schedule/sessions/${SESSION}`);
     expect(renderNotification('test_result', payloads.test_result!, 'ru').path).toBe(`/app/learn/attempts/${SESSION}`);
     expect(renderNotification('payment_overdue', payloads.payment_overdue!, 'ky').path).toBe('/app/billing');
+    expect(renderNotification('task_assigned', payloads.task_assigned!, 'ru').path).toBe(`/app/tasks/${SESSION}`);
+    expect(renderNotification('task_assigned', payloads.task_assigned!, 'ru').text).toContain('Айгуль');
+    expect(renderNotification('task_returned', payloads.task_returned!, 'en').text).toContain('Добавьте цифры');
+    expect(renderNotification('announcement_ack', payloads.announcement_ack!, 'ky').path).toBe(`/app/announcements/${SESSION}`);
+    expect(renderNotification('task_overdue', { taskId: 'javascript:alert(1)' }, 'ru').path).toBe('/app/tasks');
     const returned = renderNotification('homework_graded', { ...payloads.homework_graded, status: 'returned' }, 'ru').text;
     expect(returned).toContain(getDictionary('ru').notify.returned);
   });

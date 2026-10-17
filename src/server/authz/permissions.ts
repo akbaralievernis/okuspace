@@ -41,6 +41,9 @@ export const permissions = [
   'finance.approve',
   'monitoring.view',
   'monitoring.manage',
+  'task.manage',
+  'announcement.publish',
+  'dashboard.read',
 ] as const;
 export type Permission = (typeof permissions)[number];
 
@@ -49,15 +52,16 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
     'org.manage', 'branch.manage', 'member.read', 'member.manage', 'catalog.manage', 'group.read', 'group.manage',
     'schedule.manage', 'enrollment.manage', 'learning.read_all', 'finance.read', 'audit.read', 'site.manage', 'lead.read', 'lead.manage',
     'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage',
+    'task.manage', 'announcement.publish', 'dashboard.read',
   ],
   branch_manager: [
     'branch.manage', 'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage',
     'enrollment.manage', 'learning.read_all', 'finance.read', 'lead.read', 'lead.manage', 'attendance.manage', 'crm.admin', 'finance.approve',
-    'monitoring.view', 'monitoring.manage',
+    'monitoring.view', 'monitoring.manage', 'task.manage', 'announcement.publish', 'dashboard.read',
   ],
   admin: [
     'member.read', 'member.manage', 'group.read', 'group.manage', 'schedule.manage', 'enrollment.manage', 'lead.read', 'lead.manage',
-    'attendance.manage', 'monitoring.view',
+    'attendance.manage', 'monitoring.view', 'announcement.publish', 'dashboard.read',
   ],
   sales_manager: ['member.read', 'member.manage', 'group.read', 'enrollment.manage', 'lead.read', 'lead.manage'],
   accountant: ['member.read', 'group.read', 'finance.read', 'finance.write', 'finance.refund'],
@@ -83,5 +87,5 @@ export const roleGrants: Record<Role, readonly Role[]> = {
   parent: [],
 };
 
-/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009–0013). */
-export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage'];
+/** Права, для которых обязателен MFA (aal2) — совпадает с политиками БД (миграции 0005–0006, 0009–0013, 0015). */
+export const mfaRequiredPermissions: readonly Permission[] = ['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage', 'task.manage', 'announcement.publish'];

@@ -41,6 +41,14 @@ describe('TypeScript RBAC mirror matches the database', () => {
     for (const p of policies.filter((x) => (x.with_check ?? '').length > 0)) {
       expect(`${p.tablename}: ${p.with_check}`).toMatch(/aal2|can_assign_role/);
     }
-    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage']);
+    expect(mfaRequiredPermissions).toEqual(['member.manage', 'finance.write', 'finance.refund', 'site.manage', 'lead.manage', 'attendance.manage', 'ai.manage', 'crm.admin', 'finance.approve', 'monitoring.view', 'monitoring.manage', 'task.manage', 'announcement.publish']);
+    // Блок A: задачи и объявления меняются только функциями — каждая требует aal2.
+    const fns = await rows<{ proname: string; src: string }>(
+      db,
+      `select proname, prosrc as src from pg_proc where pronamespace = 'public'::regnamespace
+       and proname in ('task_create', 'task_transition', 'announcement_publish', 'announcement_archive')`,
+    );
+    expect(fns).toHaveLength(4);
+    for (const f of fns) expect(f.src, f.proname).toMatch(/current_aal\(\) <> 'aal2'/);
   });
 });

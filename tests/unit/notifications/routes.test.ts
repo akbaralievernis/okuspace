@@ -57,7 +57,7 @@ describe('cron route', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.scheduled).toEqual({ error: true });
     expect(body.deliveries).toEqual({ processed: 0, sent: 0, retry: 0, skipped: 0 });
-    expect(rpc.mock.calls.map((c) => c[0])).toEqual(['generate_scheduled_notifications', 'claim_deliveries', 'monitoring_purge', 'crm_purge_stale']);
+    expect(rpc.mock.calls.map((c) => c[0])).toEqual(['generate_scheduled_notifications', 'generate_task_reminders', 'claim_deliveries', 'monitoring_purge', 'crm_purge_stale']);
     expect(rpc).toHaveBeenCalledWith('crm_purge_stale', { p_months: 24 });
   });
 });
